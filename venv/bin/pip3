@@ -1,4 +1,4 @@
-#!/Users/svetlin/MyWorkspace/monet-timestreams/venv/bin/python3.6
+#!/Users/svetlin/MyWorkspace/monet-ts/venv/bin/python3.6
 
 # -*- coding: utf-8 -*-
 import re

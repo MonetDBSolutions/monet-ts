@@ -1,4 +1,4 @@
-#!/Users/svetlin/MyWorkspace/monet-timestreams/venv/bin/python
+#!/Users/svetlin/MyWorkspace/monet-ts/venv/bin/python
 
 import sys
 import getopt
