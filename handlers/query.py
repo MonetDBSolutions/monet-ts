@@ -6,5 +6,9 @@ logger = logging.getLogger('boilerplate.' + __name__)
 
 class QueryHandler(BaseHandler):
     def get(self):
-        self.write('Hello from QueryHandler!\n')
+        q = self.get_query_argument('q')
+        print(self.decode_argument(q))
+        self.set_status(200)
+        self.write(str(q) + '\n')
+        self.finish()
 
