@@ -1,5 +1,4 @@
-create SCHEMA timetrails;
-set SCHEMA timetrails;
+SET SCHEMA timetrails;
 
 drop TABLE rooms;
 create table rooms (
@@ -26,9 +25,9 @@ INSERT INTO  rooms VALUES
 (timestamp '2017/01/01 12:00:15.000', 'L302', 3, 21.5),
 (timestamp '2017/01/01 12:00:30.000', 'L302', 3, 21.5),
 (timestamp '2017/01/01 12:00:45.000', 'L302', 3, 21.5),
-(timestamp '2017/01/01 09:00:00.000', 'L301', 3, 19.3),
-(timestamp '2017/01/01 09:00:15.000', 'L301', 3, 18.3),
-(timestamp '2017/01/01 09:00:30.000', 'L301', 3, 17.4),
-(timestamp '2017/01/01 09:00:45.000', 'L301', 3, 13.5);
+(timestamp '2017/01/01 13:00:00.000', 'L301', 3, 19.3),
+(timestamp '2017/01/01 13:00:15.000', 'L301', 3, 18.3),
+(timestamp '2017/01/01 13:00:30.000', 'L301', 3, 17.4),
+(timestamp '2017/01/01 13:00:45.000', 'L301', 3, 13.5);
 
 

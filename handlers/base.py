@@ -43,3 +43,4 @@ class BaseHandler(tornado.web.RequestHandler):
         arg = self.request.arguments[name]
         logger.debug("Found '%s': %s in JSON arguments" % (name, arg))
         return arg
+
