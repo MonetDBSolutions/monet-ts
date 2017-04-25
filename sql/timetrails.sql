@@ -31,7 +31,7 @@ BEGIN
 END;
 
 --Return the measure names for a metric relation
-CREATE FUNCTION timetrails.measures(metric string)
+CREATE FUNCTION timetrails.fields(metric string)
 RETURNS TABLE (colname string)
 BEGIN 
    RETURN SELECT c.name 
@@ -73,8 +73,8 @@ BEGIN
 END;
 
 --Extracts epoch time in ms from given timestamp
-CREATE FUNCTION timetrails.epoch(ts TIMESTAMP)
-RETURNS BIGINT
-BEGIN
-    RETURN SELECT CAST((ts - TIMESTAMP '1970/01/01 00:00:00.000') as BIGINT);
-END;
+-- CREATE FUNCTION timetrails.epoch(ts TIMESTAMP)
+-- RETURNS BIGINT
+-- BEGIN
+--     RETURN SELECT CAST((ts - TIMESTAMP '1970/01/01 00:00:00.000') as BIGINT);
+-- END;
