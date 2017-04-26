@@ -1,0 +1,4 @@
+hbmqtt==0.8
+jsonschema==2.6.0
+pymonetdb==1.0.5
+tornado==4.5.1

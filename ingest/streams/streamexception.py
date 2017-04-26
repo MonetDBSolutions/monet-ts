@@ -1,0 +1,3 @@
+
+class StreamException(Exception):
+    pass
