@@ -20,7 +20,7 @@ def parse_influxdb_line(line):
     if len(schema_and_stream) == 0:
         raise StreamException("The measurement field is missing!")
     elif len(schema_and_stream) == 1:
-        schema = 'sys'
+        schema = 'timetrails'
         stream = schema_and_stream[0]
     else:
         schema = schema_and_stream[0]
