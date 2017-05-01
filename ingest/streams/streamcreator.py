@@ -64,6 +64,22 @@ def validate_json_schema_and_create_stream(connection, schema):
     properties = OrderedDict()
     req_fields = []
 
+    if "tags" in schema:
+        properties['tags'] = {  # This won't be required!
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": True,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "enum": schema["tags"]},
+                    "value": {"type": "string", "pattern": "[a-zA-Z0-9]+"}
+                },
+                "required": ["key", "value"],
+                "additionalProperties": False
+            }
+        }
+
     for key, value in validated_columns.items():
         value.add_json_schema_entry(properties)  # append new properties entry
         if not value.is_nullable():  # check if it's required or not
@@ -145,9 +161,26 @@ def load_streams_from_database(connection, current_streams, tables, columns):
 
             if errors is not None and next_concatenated_name in errors:
                 continue
-            elif has_timestamp:
+            elif has_timestamp:  # IMPORTANT -> Ignoring streams with no timestamps!!
                 properties = OrderedDict()
                 req_fields = []
+
+                # ignoring for now
+                if "tags" in kwargs_dic:
+                    properties['tags'] = {  # This won't be required!
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": True,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {"type": "string", "enum": kwargs_dic["tags"]},
+                                "value": {"type": "string", "pattern": "[a-zA-Z0-9]+"}
+                            },
+                            "required": ["key", "value"],
+                            "additionalProperties": False
+                        }
+                    }
 
                 for key, value in built_columns.items():
                     value.add_json_schema_entry(properties)  # append new properties entry

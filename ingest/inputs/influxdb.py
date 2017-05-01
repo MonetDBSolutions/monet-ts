@@ -3,6 +3,10 @@ from ingest.streams.streamexception import StreamException
 
 
 def parse_influxdb_line(line):
+    """
+    <metric> <space> [<tagkey>=<tagvalue>,[<tagkey>=<tagvalue>]] <space>
+    <fieldkey>=<fieldvalue>[,<fieldkey>=<fieldvalue>] [<timestamp>]
+    """
     groups = line.split()
 
     if len(groups) < 2:

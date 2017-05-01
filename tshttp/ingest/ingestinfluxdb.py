@@ -1,31 +1,13 @@
 import asyncio
-import json
-import tornado.web
 
 from jsonschema import ValidationError
 from ingest.inputs import influxdb
 from ingest.monetdb.naming import THREAD_POOL
 from ingest.streams.context import get_streams_context
+from tshttp.tslinehandler import TSBaseLineHandler
 
 
-class InfluxDBHandler(tornado.web.RequestHandler):
-    """Request handler for InfluxDB ingestion"""
-
-    def data_received(self, chunk):
-        pass
-
-    def write_error(self, status_code, **kwargs):
-        if 'message' not in kwargs:
-            if status_code == 405:
-                kwargs['message'] = 'Invalid HTTP method.'
-            else:
-                kwargs['message'] = 'Unknown error.'
-
-        self.write(json.dumps(kwargs))
-        self.set_status(status_code)
-
-
-class InfluxDBInput(InfluxDBHandler):
+class InfluxDBInput(TSBaseLineHandler):
     """Ingest a single point under the InfluxDB protocol"""
 
     async def post(self):  # add data to a stream

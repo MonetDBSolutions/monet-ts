@@ -1,34 +1,14 @@
 import asyncio
-import tornado.web, tornado.escape
 
 from collections import OrderedDict
 from jsonschema import ValidationError
 from ingest.inputs.jsonschemas import CREATE_STREAMS_SCHEMA, DELETE_STREAMS_SCHEMA
 from ingest.monetdb.naming import THREAD_POOL
 from ingest.streams.context import get_streams_context
+from tshttp.tsjsonhandler import TSBaseJSONHandler
 
 
-class JsonHandler(tornado.web.RequestHandler):
-    """Request handler where requests and responses speak JSON."""
-
-    def data_received(self, chunk):
-        pass
-
-    def set_default_headers(self):
-        self.set_header('Content-Type', 'application/json')
-
-    def write_error(self, status_code, **kwargs):
-        if 'message' not in kwargs:
-            if status_code == 405:
-                kwargs['message'] = 'Invalid HTTP method.'
-            else:
-                kwargs['message'] = 'Unknown error.'
-
-        self.write(tornado.escape.json_encode(kwargs))
-        self.set_status(status_code)
-
-
-class StreamInput(JsonHandler):
+class StreamInput(TSBaseJSONHandler):
     """RESTful API for stream's input"""
 
     def get(self, schema_name, stream_name):  # check a single stream data
@@ -38,7 +18,7 @@ class StreamInput(JsonHandler):
             self.write_error(404, **{'message': ex.__str__()})
             return
 
-        self.write(tornado.escape.json_encode(OrderedDict(stream.get_data_dictionary())))
+        self.write(OrderedDict(stream.get_data_dictionary()))
         self.set_status(200)
 
     async def post(self, schema, stream):  # add data to a stream
@@ -49,8 +29,8 @@ class StreamInput(JsonHandler):
             return
 
         try:  # validate and insert data, if not return 400
-            await asyncio.wrap_future(THREAD_POOL.submit(stream.insert_json,
-                                                         tornado.escape.json_decode(self.request.body)))
+            new_points_array = self.read_body()
+            await asyncio.wrap_future(THREAD_POOL.submit(stream.insert_json, new_points_array))
         except (ValidationError, BaseException) as ex:
             self.write_error(400, **{'message': ex.__str__()})
             return
@@ -58,21 +38,21 @@ class StreamInput(JsonHandler):
         self.set_status(201)
 
 
-class StreamsInfo(JsonHandler):
+class StreamsInfo(TSBaseJSONHandler):
     """Collect all streams information"""
 
     def get(self):  # get all streams data
         results = get_streams_context().get_streams_data()
-        self.write(tornado.escape.json_encode(results))
+        self.write(results)
         self.set_status(200)
 
 
-class StreamsHandling(JsonHandler):
+class StreamsHandling(TSBaseJSONHandler):
     """Admin class for creating/deleting streams"""
 
     async def post(self):
         try:
-            schema_to_validate = tornado.escape.json_decode(self.request.body)
+            schema_to_validate = self.read_body()
             CREATE_STREAMS_SCHEMA.validate(schema_to_validate)
             stream_context = get_streams_context()
             await asyncio.wrap_future(THREAD_POOL.submit(stream_context.add_new_stream, schema_to_validate))
@@ -84,7 +64,7 @@ class StreamsHandling(JsonHandler):
 
     async def delete(self):
         try:
-            schema_to_validate = tornado.escape.json_decode(self.request.body)
+            schema_to_validate = self.read_body()
             DELETE_STREAMS_SCHEMA.validate(schema_to_validate)
         except BaseException as ex:
             self.write_error(400, **{'message': ex.__str__()})

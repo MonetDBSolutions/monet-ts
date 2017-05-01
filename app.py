@@ -54,4 +54,4 @@ if __name__ == "__main__":
         con_password = getpass.getpass(prompt="Insert password for user " + args['user'] + ":")
 
     init_streams_context(args['dhost'], args['dport'], args['user'], con_password, args['database'])
-    init_servers(args['port'])
+    init_servers(args['port'], 1833)

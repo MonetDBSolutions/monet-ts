@@ -135,6 +135,14 @@ CREATE_STREAMS_SCHEMA = Draft4Validator({
                     "additionalProperties": False
                 }]
             }
+        },
+        "tags": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": True,
+            "items": {
+                "type": "string"
+            }
         }
     },
     "required": ["schema", "stream", "flushing", "columns"],
