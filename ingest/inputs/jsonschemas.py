@@ -4,7 +4,8 @@ TIMED_FLUSH_IDENTIFIER = "time"
 TUPLE_FLUSH_IDENTIFIER = "tuple"
 AUTO_FLUSH_IDENTIFIER = "auto"
 
-UNBOUNDED_TEXT_INPUTS = ["clob", "text", "string"]
+TEXT_INPUT = "text"
+UNBOUNDED_TEXT_INPUTS = [TEXT_INPUT, "clob", "string"]
 BOUNDED_TEXT_INPUTS = ["char", "varchar", "character"]
 
 BOOLEAN_INPUTS = ["bool", "boolean"]
@@ -151,7 +152,7 @@ CREATE_STREAMS_SCHEMA = Draft4Validator({
 
 DELETE_STREAMS_SCHEMA = Draft4Validator({
     "title": "JSON schema to delete a stream",
-    "description": "Validate the inserted properties",
+    "description": "Just send the schema and the stream",
     "$schema": "http://json-schema.org/draft-04/schema#",
     "type": "object",
     "properties": {
@@ -160,4 +161,26 @@ DELETE_STREAMS_SCHEMA = Draft4Validator({
     },
     "required": ["schema", "stream"],
     "additionalProperties": False
+}, format_checker=FormatChecker())
+
+INSERT_DATA_SCHEMA = Draft4Validator({
+    "title": "Insert data into streams",
+    "description": "Validate the inserted properties",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "array",
+    "minItems": 1,
+    "items": {
+        "type": "object",
+        "properties": {
+            "schema": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
+            "stream": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
+            "values": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": False,
+                "items": {"type": "object"}
+            }
+        },
+        "required": ["schema", "stream", "values"]
+    }
 }, format_checker=FormatChecker())

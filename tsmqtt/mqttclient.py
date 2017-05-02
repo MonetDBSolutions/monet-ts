@@ -1,42 +1,45 @@
 import asyncio
-import logging
 
 from hbmqtt.client import MQTTClient, ClientException
 from hbmqtt.mqtt.constants import QOS_2
-from jsonschema import ValidationError
-from ingest.inputs import influxdb
+from ingest.inputs import influxdbparser
 from ingest.monetdb.naming import THREAD_POOL
+from ingest.others import read_chunk_lines, CHUNK_SIZE
 from ingest.streams.context import get_streams_context
-
-logger = logging.getLogger('MonetDBTS ' + __name__)
+from ingest.streams.streamexception import StreamException
 
 
 async def mqttclient_coro():
-    C = MQTTClient()
-    await C.connect('mqtt://localhost:1883/')
-    await C.subscribe([('/influxdb', QOS_2), ])
+    client = MQTTClient()
+    await client.connect('mqtt://localhost:1883/')
+    await client.subscribe([('/influxdb', QOS_2), ])
     try:
         while True:
-            message = await C.deliver_message()
+            base_tuple_counter = 0
+            errors = []
+            message = await client.deliver_message()
             packet = message.publish_packet
 
-            try:  # TODO check UTF-8 strings?
-                schema, stream, tags, values = influxdb.parse_influxdb_line(packet.payload.data.decode("utf-8"))
-            except BaseException as ex:
-                await C.publish('answer', ex.__str__().encode('utf-8'), qos=QOS_2)
-                continue
+            for lines in read_chunk_lines(packet.payload.data.decode("utf-8"), CHUNK_SIZE):
+                try:
+                    grouped_streams = influxdbparser.parse_influxdb_line(lines, base_tuple_counter)
+                    try:  # TODO check UTF-8 strings?
+                        for key, values in grouped_streams.items():
+                            stream = get_streams_context().get_existing_metric(key)
+                            await asyncio.wrap_future(THREAD_POOL.submit(stream.insert_values, values,
+                                                                         base_tuple_counter))
+                    except StreamException as ex:
+                        errors.append(ex.args[0]['message'])
+                except StreamException as ex:
+                    errors.append(ex.args[0]['message'])
 
-            try:  # check if stream exists, if not return 404
-                stream = get_streams_context().get_existing_stream(schema, stream)
-            except BaseException as ex:
-                await C.publish('answer', ex.__str__().encode('utf-8'), qos=QOS_2)
-                continue
+                base_tuple_counter += CHUNK_SIZE
 
-            try:  # validate and insert data, if not return 400
-                await asyncio.wrap_future(THREAD_POOL.submit(stream.insert_json, [values]))
-            except (ValidationError, BaseException) as ex:
-                await C.publish('answer', ex.__str__().encode('utf-8'), qos=QOS_2)
-                continue
+            if len(errors) > 0:
+                await client.publish('answer', errors.__str__().encode('utf-8'), qos=QOS_2)
+            else:
+                await client.publish('answer', 'OK'.encode('utf-8'), qos=QOS_2)
+
     except ClientException:
-        await C.unsubscribe(['/influxdb'])
-        await C.disconnect()
+        await client.unsubscribe(['/influxdb'])
+        await client.disconnect()
