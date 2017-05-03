@@ -1,11 +1,11 @@
 import asyncio
-
 from collections import OrderedDict
-from ingest.inputs import jsonparser
-from ingest.inputs.jsonparser import parse_json_create_stream, parse_json_delete_stream, validate_json_tuples
+
 from ingest.monetdb.naming import THREAD_POOL
 from ingest.streams.context import get_streams_context
 from ingest.streams.streamexception import StreamException
+from ingest.tsjson import jsonparser
+from ingest.tsjson.jsonparser import parse_json_create_stream, parse_json_delete_stream, validate_json_tuples
 from tshttp.tsjsonhandler import TSBaseJSONHandler
 
 
@@ -34,7 +34,8 @@ class JSONInput(TSBaseJSONHandler):
                 try:
                     metric = get_streams_context().get_existing_metric(key)
                     validate_json_tuples(metric, values)
-                    await asyncio.wrap_future(THREAD_POOL.submit(metric.insert_values, values, 0))
+                    await asyncio.wrap_future(THREAD_POOL.submit(metric.insert_values, values, 0,
+                                                                 'convert_value_into_sql_from_json'))
                 except StreamException as ex:
                     errors.append(ex.args[0]['message'])
         except StreamException as ex:
@@ -59,7 +60,7 @@ class StreamsHandling(TSBaseJSONHandler):
             json_schema = self.read_body()
             parse_json_create_stream(json_schema)
             stream_context = get_streams_context()
-            await asyncio.wrap_future(THREAD_POOL.submit(stream_context.add_new_stream, json_schema))
+            await asyncio.wrap_future(THREAD_POOL.submit(stream_context.add_new_stream_with_json, json_schema))
         except StreamException as ex:
             self.write_error(400, **{'message': ex.args[0]['message']})
             return

@@ -4,11 +4,12 @@ TIMED_FLUSH_IDENTIFIER = "time"
 TUPLE_FLUSH_IDENTIFIER = "tuple"
 AUTO_FLUSH_IDENTIFIER = "auto"
 
-TEXT_INPUT = "text"
-UNBOUNDED_TEXT_INPUTS = [TEXT_INPUT, "clob", "string"]
+TEXT_INPUT = "clob"
+UNBOUNDED_TEXT_INPUTS = [TEXT_INPUT, "text", "string"]
 BOUNDED_TEXT_INPUTS = ["char", "varchar", "character"]
 
-BOOLEAN_INPUTS = ["bool", "boolean"]
+BOOLEAN_INPUT = "bool"
+BOOLEAN_INPUTS = [BOOLEAN_INPUT, "boolean"]
 
 INTERVAL_TYPES_INTERNAL = ["sec_interval", "month_interval"]
 INTERVAL_INPUTS = ["interval second", "interval minute", "interval hour", "interval day", "interval month",
@@ -16,9 +17,11 @@ INTERVAL_INPUTS = ["interval second", "interval minute", "interval hour", "inter
                    "interval day to second", "interval hour to minute", "interval hour to second",
                    "interval minute to second"]
 
-INTEGER_INPUTS = ["tinyint", "smallint", "int", "bigint", "integer"] + INTERVAL_INPUTS
+INTEGER_INPUT = "int"
+INTEGER_INPUTS = ["tinyint", "smallint", INTEGER_INPUT, "bigint", "integer"] + INTERVAL_INPUTS
 
-FLOATING_POINT_PRECISION_INPUTS = ["real", "double", "float"]
+FLOATING_POINT_PRECISION_INPUT = "real"
+FLOATING_POINT_PRECISION_INPUTS = [FLOATING_POINT_PRECISION_INPUT, "double", "float"]
 
 DATE_INPUTS = ["date"]
 

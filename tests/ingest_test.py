@@ -1,10 +1,9 @@
 import http.client
+import json
+import time
 import unittest
 
 from multiprocessing import Process
-
-import time
-
 from ingest.streams.context import init_streams_context
 from settings.ingestservers import init_servers
 
@@ -20,6 +19,15 @@ def init_guardian_server():
     init_servers(TESTING_GUARDIAN_PORT, 1833)
 
 
+def ordered(obj):
+    if isinstance(obj, dict):
+        return sorted((k, ordered(v)) for k, v in obj.items())
+    if isinstance(obj, list):
+        return sorted(ordered(x) for x in obj)
+    else:
+        return obj
+
+
 class IngestTest(unittest.TestCase):
     Guardian_Servers = None
     HTTP_Client = None
@@ -31,7 +39,7 @@ class IngestTest(unittest.TestCase):
         time.sleep(2)
         cls.HTTP_Client = http.client.HTTPConnection(TESTING_GUARDIAN_HOSTNAME, TESTING_GUARDIAN_PORT)
 
-    def test_create_stream_json(self):
+    def test_a_create_stream_json(self):
         insert_string = """
         {
             "schema": "sys",
@@ -48,17 +56,91 @@ class IngestTest(unittest.TestCase):
         response.read()
         self.assertEqual(response.status, 201)
 
-    def test_insert_data(self):
+    def test_b_insert_data(self):
         insert_string = """
-        [{"schema":"sys","stream":"testing","values":[{"a":100,"b":"cool"},{"a":2,"b":"lekker"},{"a":3,"b":"mmm"}]}]
+        [{"schema":"sys","stream":"testing","values":[
+          {"a":100,"b":"cool"},{"a":2,"b":"lekker"},{"a":-1,"b":"b"},{"a":3,"b":"mmm","ticks":1493801541},{"b":"mmm"}
+        ]}]
         """
         IngestTest.HTTP_Client.request('POST', '/json', body=insert_string)
         response = IngestTest.HTTP_Client.getresponse()
         response.read()
         self.assertEqual(response.status, 201)
 
+    def test_c_get_one(self):
+        result_string = json.loads("""{
+          "columns": [
+            {
+              "name": "a",
+              "tag": false,
+              "type": "int",
+              "nullable": true
+            },
+            {
+              "name": "b",
+              "tag": false,
+              "type": "text",
+              "nullable": false
+            },
+            {
+              "name": "ticks",
+              "tag": false,
+              "type": "timestamp with time zone",
+              "nullable": true
+            }
+          ],
+          "flushing": {
+            "base": "auto"
+          },
+          "schema": "sys",
+          "stream": "testing"
+        }""")
+        IngestTest.HTTP_Client.request('GET', '/stream/sys/testing')
+        response = IngestTest.HTTP_Client.getresponse()
+        body = json.loads(response.read().decode('utf8'))
+        self.assertEqual(ordered(body), ordered(result_string))
+        self.assertEqual(response.status, 200)
 
-    def test_delete_stream_json(self):
+    def test_d_get_all(self):
+        result_string = json.loads("""{
+          "streams_listing": [
+            {
+              "columns": [
+                {
+                  "nullable": true,
+                  "tag": false,
+                  "name": "a",
+                  "type": "int"
+                },
+                {
+                  "nullable": false,
+                  "tag": false,
+                  "name": "b",
+                  "type": "text"
+                },
+                {
+                  "nullable": true,
+                  "tag": false,
+                  "name": "ticks",
+                  "type": "timestamp with time zone"
+                }
+              ],
+              "stream": "testing",
+              "flushing": {
+                "base": "auto"
+              },
+              "schema": "sys"
+            }
+          ],
+          "streams_count": 1
+        }""")
+        IngestTest.HTTP_Client.request('GET', '/context')
+        response = IngestTest.HTTP_Client.getresponse()
+        body = json.loads(response.read().decode('utf8'))
+        self.assertEqual(ordered(body), ordered(result_string))
+        self.assertEqual(response.status, 200)
+
+    def test_e_delete_stream_json(self):
         insert_string = """
         {
             "schema": "sys",

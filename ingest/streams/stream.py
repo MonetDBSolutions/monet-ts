@@ -11,6 +11,7 @@ from ingest.monetdb.mapiconnection import PyMonetDBConnection
 from ingest.monetdb.naming import TIME_BASED_STREAM, TUPLE_BASED_STREAM, AUTO_BASED_STREAM, TIMESTAMP_COLUMN_NAME
 from ingest.streams.datatypes import StreamDataType
 from ingest.streams.streamexception import StreamException, TABLE_CONSTRAINTS_VALIDATION
+from ingest.tsinfluxline.influxdbparser import InfluxDBLineException
 
 SCHEDULER = sched.scheduler(time.time, time.sleep)
 
@@ -26,8 +27,8 @@ class BaseIOTStream(object):
         self._columns = columns  # dictionary of name -> data_types
         self._validation_schema = json_validation_schema  # json validation schema for the inserts
         self._table_id = table_id  # for delete statement on table iot.webserverstreams
-        self.inserts = []
-        self.connection = connection
+        self._inserts = []
+        self._connection = connection
 
     def get_schema_name(self) -> str:
         return self._schema_name
@@ -75,7 +76,7 @@ class BaseIOTStream(object):
     def _flush_data(self):
         pass
 
-    def insert_values(self, new_data, base_tuple_counter: int) -> None:
+    def insert_values(self, new_data, base_tuple_counter: int, converter_function: str) -> None:
         errors = []
         column_names = self._columns.keys()
         parsed_array = []
@@ -98,14 +99,22 @@ class BaseIOTStream(object):
                         errors.append("The non nullable column %s is missing at the line %d!" %
                                       (column, base_tuple_counter))
                 else:
-                    parsed_array.append(data_type.convert_value_into_sql(entry[column]))
+                    if converter_function == 'convert_value_into_sql_from_influxdb':
+                        try:
+                            data_type.validate_influxdb_entry(entry[column])
+                        except InfluxDBLineException as ex:
+                            errors.append("The column %s at line %d does not follow the InfluxDB protocol: %s" %
+                                          (column, base_tuple_counter, ex.__str__()))
+
+                    str_value = getattr(data_type, converter_function)(entry[column])
+                    parsed_array.append(str_value)
 
             new_inserts.append("(" + ','.join(parsed_array) + ")")
 
         if errors:
             raise StreamException({'type': TABLE_CONSTRAINTS_VALIDATION, 'message': errors})
 
-        self.inserts.extend(new_inserts)
+        self._inserts.extend(new_inserts)
         self._flush_data()
 
 
@@ -123,16 +132,16 @@ class TupleBasedStream(BaseIOTStream):
         pass
 
     def get_flushing_dictionary(self) -> Dict[str, Any]:
-        return {'base': 'tuple', 'interval': self._interval, 'tuples_inserted_per_basket': len(self.inserts)}
+        return {'base': 'tuple', 'interval': self._interval, 'tuples_inserted_per_basket': len(self._inserts)}
 
     def get_stream_table_sql_statement(self) -> str:  # insert for iot.webserverflushing table
         return str(TUPLE_BASED_STREAM) + ',' + str(self._interval) + ",NULL"
 
     def _flush_data(self) -> None:
-        if len(self.inserts) > self._interval:
-            sql_columns = ','.join(self.inserts[:self._interval])
-            self.connection.insert_points(self._schema_name, self._stream_name, sql_columns)
-            del self.inserts[:self._interval]
+        if len(self._inserts) > self._interval:
+            sql_columns = ','.join(self._inserts[:self._interval])
+            self._connection.insert_points(self._schema_name, self._stream_name, sql_columns)
+            del self._inserts[:self._interval]
 
 
 def time_based_flush(time_based_stream) -> None:
@@ -172,7 +181,7 @@ class TimeBasedStream(BaseIOTStream):
 
     def get_flushing_dictionary(self) -> Dict[str, Any]:
         return {'base': 'time', 'interval': self._interval, 'time_unit': self._time_unit,
-                'tuples_inserted_per_basket': len(self.inserts)}
+                'tuples_inserted_per_basket': len(self._inserts)}
 
     def get_stream_table_sql_statement(self) -> str:  # insert for iot.webserverflushing table
         return str(TIME_BASED_STREAM) + ',' + str(self._interval) + ',' + str(self._time_unit)
@@ -200,6 +209,6 @@ class AutoFlushedStream(BaseIOTStream):
         return str(AUTO_BASED_STREAM) + ',NULL,NULL'
 
     def _flush_data(self) -> None:
-        sql_columns = ','.join(self.inserts)
-        self.connection.insert_points(self._schema_name, self._stream_name, sql_columns)
-        del self.inserts[:]
+        sql_columns = ','.join(self._inserts)
+        self._connection.insert_points(self._schema_name, self._stream_name, sql_columns)
+        del self._inserts[:]

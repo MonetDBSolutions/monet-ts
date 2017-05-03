@@ -2,11 +2,12 @@ import asyncio
 
 from hbmqtt.client import MQTTClient, ClientException
 from hbmqtt.mqtt.constants import QOS_2
-from ingest.inputs import influxdbparser
+
 from ingest.monetdb.naming import THREAD_POOL
-from ingest.others import read_chunk_lines, CHUNK_SIZE
 from ingest.streams.context import get_streams_context
 from ingest.streams.streamexception import StreamException
+from ingest.tsinfluxline import influxdbparser
+from ingest.tsinfluxline.linereader import read_chunk_lines, CHUNK_SIZE
 
 
 async def mqttclient_coro():
@@ -27,7 +28,8 @@ async def mqttclient_coro():
                         for key, values in grouped_streams.items():
                             stream = get_streams_context().get_existing_metric(key)
                             await asyncio.wrap_future(THREAD_POOL.submit(stream.insert_values, values,
-                                                                         base_tuple_counter))
+                                                                         base_tuple_counter,
+                                                                         'convert_value_into_sql_from_influxdb'))
                     except StreamException as ex:
                         errors.append(ex.args[0]['message'])
                 except StreamException as ex:

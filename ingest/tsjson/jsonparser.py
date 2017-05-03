@@ -3,11 +3,11 @@ from typing import Any, Dict, List
 
 from jsonschema import ValidationError
 
-from ingest.inputs.jsonschemas import INSERT_DATA_SCHEMA, CREATE_STREAMS_SCHEMA, DELETE_STREAMS_SCHEMA
 from ingest.monetdb.naming import get_context_entry_name
 from ingest.streams.stream import BaseIOTStream
 from ingest.streams.streamexception import StreamException, JSON_SCHEMA_CREATE_VIOLATION, \
     JSON_SCHEMA_LINE_SPLIT_VIOLATION, JSON_SCHEMA_INSERT_VIOLATION
+from ingest.tsjson.jsonschemas import INSERT_DATA_SCHEMA, CREATE_STREAMS_SCHEMA, DELETE_STREAMS_SCHEMA
 
 
 def parse_json_create_stream(schema_to_validate: Any) -> None:
