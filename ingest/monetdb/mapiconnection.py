@@ -48,7 +48,7 @@ class PyMonetDBConnection(object):
             self._connection.rollback()
             raise StreamException({'type': MAPI_CONNECTION, 'message': ex.__str__()})
 
-    def create_stream(self, schema: str, stream: str, columns: str, keys: str, flush_statement: str) -> str:
+    def create_stream(self, schema: str, stream: str, columns: str, flush_statement: str) -> str:
         try:
             try:  # TODO CREATE SCHEMA IF NOT EXISTS
                 self._cursor.execute("CREATE SCHEMA %s" % schema)
@@ -56,11 +56,8 @@ class PyMonetDBConnection(object):
             except:
                 self._connection.rollback()
 
-            if keys != '':
-                keys = ', PRIMARY KEY (' + keys + ')'
-
             # TODO put STREAM back!! -> CREATE STREAM TABLE
-            self._cursor.execute("CREATE TABLE %s.%s (%s %s)" % (schema, stream, columns, keys))
+            self._cursor.execute("CREATE TABLE %s.%s (%s)" % (schema, stream, columns))
             self._cursor.execute("SELECT id FROM sys.schemas WHERE \"name\"='%s'" % schema)
             schema_id = self._cursor.fetchall()[0][0]
             self._cursor.execute("SELECT id FROM sys.tables WHERE schema_id=%s AND \"name\"='%s'" % (schema_id, stream))

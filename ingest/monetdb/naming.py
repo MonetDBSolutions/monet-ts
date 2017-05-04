@@ -21,4 +21,4 @@ def get_context_entry_name(schema_name: str, stream_name: str) -> str:
 
 
 def get_schema_and_stream_name(concat_name: str) -> List[str]:
-    return concat_name.split(METRIC_SEPARATOR)[2:]
+    return concat_name.split(METRIC_SEPARATOR)[:2]

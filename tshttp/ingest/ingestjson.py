@@ -34,8 +34,7 @@ class JSONInput(TSBaseJSONHandler):
                 try:
                     metric = get_streams_context().get_existing_metric(key)
                     validate_json_tuples(metric, values)
-                    await asyncio.wrap_future(THREAD_POOL.submit(metric.insert_values, values, 0,
-                                                                 'convert_value_into_sql_from_json'))
+                    await asyncio.wrap_future(THREAD_POOL.submit(metric.insert_values, values, 0))
                 except StreamException as ex:
                     errors.append(ex.args[0]['message'])
         except StreamException as ex:

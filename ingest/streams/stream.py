@@ -4,14 +4,12 @@ import time
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from typing import Dict, Any
-
 from jsonschema import Draft4Validator
 
 from ingest.monetdb.mapiconnection import PyMonetDBConnection
 from ingest.monetdb.naming import TIME_BASED_STREAM, TUPLE_BASED_STREAM, AUTO_BASED_STREAM, TIMESTAMP_COLUMN_NAME
 from ingest.streams.datatypes import StreamDataType
 from ingest.streams.streamexception import StreamException, TABLE_CONSTRAINTS_VALIDATION
-from ingest.tsinfluxline.influxdbparser import InfluxDBLineException
 
 SCHEDULER = sched.scheduler(time.time, time.sleep)
 
@@ -76,7 +74,7 @@ class BaseIOTStream(object):
     def _flush_data(self):
         pass
 
-    def insert_values(self, new_data, base_tuple_counter: int, converter_function: str) -> None:
+    def insert_values(self, new_data, base_tuple_counter: int) -> None:
         errors = []
         column_names = self._columns.keys()
         parsed_array = []
@@ -99,15 +97,7 @@ class BaseIOTStream(object):
                         errors.append("The non nullable column %s is missing at the line %d!" %
                                       (column, base_tuple_counter))
                 else:
-                    if converter_function == 'convert_value_into_sql_from_influxdb':
-                        try:
-                            data_type.validate_influxdb_entry(entry[column])
-                        except InfluxDBLineException as ex:
-                            errors.append("The column %s at line %d does not follow the InfluxDB protocol: %s" %
-                                          (column, base_tuple_counter, ex.__str__()))
-
-                    str_value = getattr(data_type, converter_function)(entry[column])
-                    parsed_array.append(str_value)
+                    parsed_array.append(data_type.convert_value_into_sql(entry[column]))
 
             new_inserts.append("(" + ','.join(parsed_array) + ")")
 

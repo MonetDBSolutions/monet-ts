@@ -1,7 +1,5 @@
-import re
 from collections import OrderedDict, defaultdict
 from typing import Dict, Any, List
-
 from jsonschema import Draft4Validator, FormatChecker
 
 from ingest.monetdb.mapiconnection import PyMonetDBConnection
@@ -11,13 +9,11 @@ from ingest.streams.datatypes import TextType, LimitedTextType, IntegerType, Flo
     TimestampType, BooleanType
 from ingest.streams.stream import TupleBasedStream, TimeBasedStream, AutoFlushedStream, BaseIOTStream
 from ingest.streams.streamexception import StreamException, DATABASE_SYNCHRONIZATION, STREAM_CREATION
-from ingest.tsinfluxline.influxdbparser import BOOLEAN_REGEX, INTEGER_REGEX, FLOATING_POINT_REGEX, STRING_REGEX
-from ingest.tsinfluxline.linereader import CHUNK_SIZE
 from ingest.tsjson.jsonschemas import UNBOUNDED_TEXT_INPUTS, BOUNDED_TEXT_INPUTS, INTEGER_INPUTS, DATE_INPUTS, \
     BOOLEAN_INPUTS, FLOATING_POINT_PRECISION_INPUTS, TIME_INPUTS, TIMESTAMP_INPUTS, TIMED_FLUSH_IDENTIFIER, \
     TUPLE_FLUSH_IDENTIFIER, TIME_WITH_TIMEZONE_TYPE_INTERNAL, TIMESTAMP_WITH_TIMEZONE_TYPE_INTERNAL, \
     TIME_WITH_TIMEZONE_TYPE_EXTERNAL, TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL, AUTO_FLUSH_IDENTIFIER, \
-    INTERVAL_TYPES_INTERNAL, TEXT_INPUT, BOOLEAN_INPUT, INTEGER_INPUT, FLOATING_POINT_PRECISION_INPUT
+    INTERVAL_TYPES_INTERNAL, TEXT_INPUT, BOOLEAN_INPUT, BIGINTEGER_INPUT, DOUBLE_PRECISION_INPUT
 
 JSON_SWITCHER = [{'types': UNBOUNDED_TEXT_INPUTS, 'class': TextType},
                  {'types': BOUNDED_TEXT_INPUTS, 'class': LimitedTextType},
@@ -28,10 +24,10 @@ JSON_SWITCHER = [{'types': UNBOUNDED_TEXT_INPUTS, 'class': TextType},
                  {'types': TIME_INPUTS, 'class': TimeType},
                  {'types': TIMESTAMP_INPUTS, 'class': TimestampType}]
 
-INFLUXDB_SWITCHER = [{'regex': BOOLEAN_REGEX, 'class': BooleanType, 'type': BOOLEAN_INPUT},
-                     {'regex': INTEGER_REGEX, 'class': IntegerType, 'type': INTEGER_INPUT},
-                     {'regex': FLOATING_POINT_REGEX, 'class': FloatType, 'type': FLOATING_POINT_PRECISION_INPUT},
-                     {'regex': STRING_REGEX, 'class': TextType, 'type': TEXT_INPUT}]
+INFLUXDB_SWITCHER = [{'instance': bool, 'class': BooleanType, 'type': BOOLEAN_INPUT},
+                     {'instance': int, 'class': IntegerType, 'type': BIGINTEGER_INPUT},
+                     {'instance': float, 'class': FloatType, 'type': DOUBLE_PRECISION_INPUT},
+                     {'instance': str, 'class': TextType, 'type': TEXT_INPUT}]
 
 
 INTERVALS_DICTIONARY = {1: "interval year", 2: "interval year to month", 3: "interval month", 4: "interval day",
@@ -116,11 +112,11 @@ def validate_json_schema_and_create_stream(connection: PyMonetDBConnection, sche
 
 
 def create_stream_from_influxdb(connection: PyMonetDBConnection, schema: str, stream: str, tags: List[str],
-                                new_values: Dict[Any, Any]) -> BaseIOTStream:
+                                new_values: Dict[str, Any]) -> BaseIOTStream:
     validated_columns = OrderedDict()  # dictionary of name -> data_types
     errors = []
 
-    for key, values in new_values.items():  # create the data types dictionary
+    for key, value in new_values.items():  # create the data types dictionary
         if key in validated_columns:
             errors.append("The column %s is duplicated?" % key)
             continue
@@ -137,7 +133,7 @@ def create_stream_from_influxdb(connection: PyMonetDBConnection, schema: str, st
             found_type = True
         else:
             for entry in INFLUXDB_SWITCHER:  # allocate the proper type wrapper
-                if re.match(entry['regex'], values[0]) is not None:
+                if type(value) == entry['instance']:
                     try:
                         validated_columns[key] = entry['class'](**{'name': key, 'type': entry['type'],
                                                                    'nullable': False, 'tag': key in tags})
@@ -145,7 +141,7 @@ def create_stream_from_influxdb(connection: PyMonetDBConnection, schema: str, st
                         errors.append(
                             "Reflection error while creating the column: %s Details: %s" % (key, ex.__str__()))
                     found_type = True
-                break
+                    break
 
         if not found_type:
             raise StreamException({'type': STREAM_CREATION,
@@ -161,7 +157,7 @@ def create_stream_from_influxdb(connection: PyMonetDBConnection, schema: str, st
     }, format_checker=FormatChecker())
 
     return TupleBasedStream(schema_name=schema, stream_name=stream, columns=validated_columns,
-                            json_validation_schema=json_schema, connection=connection, table_id="", interval=CHUNK_SIZE)
+                            json_validation_schema=json_schema, connection=connection, table_id="", interval=1)
 
 
 def load_streams_from_database(connection: PyMonetDBConnection, current_streams: List[str], tables,

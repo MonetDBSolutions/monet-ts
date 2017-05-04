@@ -18,9 +18,11 @@ INTERVAL_INPUTS = ["interval second", "interval minute", "interval hour", "inter
                    "interval minute to second"]
 
 INTEGER_INPUT = "int"
-INTEGER_INPUTS = ["tinyint", "smallint", INTEGER_INPUT, "bigint", "integer"] + INTERVAL_INPUTS
+BIGINTEGER_INPUT = "bigint"
+INTEGER_INPUTS = ["tinyint", "smallint", INTEGER_INPUT, BIGINTEGER_INPUT, "integer"] + INTERVAL_INPUTS
 
 FLOATING_POINT_PRECISION_INPUT = "real"
+DOUBLE_PRECISION_INPUT = "double"
 FLOATING_POINT_PRECISION_INPUTS = [FLOATING_POINT_PRECISION_INPUT, "double", "float"]
 
 DATE_INPUTS = ["date"]

@@ -46,7 +46,6 @@ class IOTStreams(object):
         new_stream = validate_json_schema_and_create_stream(self._connection, validating_schema)
         table_id = self._connection.create_stream(new_stream.get_schema_name(), new_stream.get_stream_name(),
                                                   new_stream.get_create_sql_column_statement(),
-                                                  new_stream.get_primary_keys_statement(),
                                                   new_stream.get_stream_table_sql_statement())
         new_stream.set_table_id(table_id)  # set the table id!!
         new_stream.start_stream()
@@ -55,7 +54,13 @@ class IOTStreams(object):
     def get_or_add_new_stream_with_influxdb(self, concat_name: str, tags: List[str], values: Dict[str, Any]):
         names = get_schema_and_stream_name(concat_name)
         if concat_name not in self._context:
-            self._context[concat_name] = create_stream_from_influxdb(self._connection, names[0], names[1], tags, values)
+            new_stream = create_stream_from_influxdb(self._connection, names[0], names[1], tags, values[0])
+            table_id = self._connection.create_stream(new_stream.get_schema_name(), new_stream.get_stream_name(),
+                                                      new_stream.get_create_sql_column_statement(),
+                                                      new_stream.get_stream_table_sql_statement())
+            new_stream.set_table_id(table_id)  # set the table id!!
+            new_stream.start_stream()
+            self._context[concat_name] = new_stream
         return self._context[concat_name]
 
     def delete_existing_stream(self, validating_schema) -> None:
