@@ -4,7 +4,7 @@ from jsonschema import Draft4Validator, FormatChecker
 
 from ingest.monetdb.mapiconnection import PyMonetDBConnection
 from ingest.monetdb.naming import get_context_entry_name, TUPLE_BASED_STREAM, TIME_BASED_STREAM, AUTO_BASED_STREAM, \
-    TIMESTAMP_COLUMN_NAME
+    TIMESTAMP_COLUMN_NAME, DISCOVERED_STREAMS_INTERVAL_SIZE
 from ingest.streams.datatypes import TextType, LimitedTextType, IntegerType, FloatType, DateType, TimeType, \
     TimestampType, BooleanType
 from ingest.streams.stream import TupleBasedStream, TimeBasedStream, AutoFlushedStream, BaseIOTStream
@@ -157,7 +157,8 @@ def create_stream_from_influxdb(connection: PyMonetDBConnection, schema: str, st
     }, format_checker=FormatChecker())
 
     return TupleBasedStream(schema_name=schema, stream_name=stream, columns=validated_columns,
-                            json_validation_schema=json_schema, connection=connection, table_id="", interval=1)
+                            json_validation_schema=json_schema, connection=connection, table_id="",
+                            interval=DISCOVERED_STREAMS_INTERVAL_SIZE)
 
 
 def load_streams_from_database(connection: PyMonetDBConnection, current_streams: List[str], tables,

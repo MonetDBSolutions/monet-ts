@@ -30,7 +30,7 @@ class StreamDataType(object):
 
     def create_stream_sql(self) -> str:  # get column creation statement on SQL
         null_word = 'NOT NULL' if not self._is_nullable else 'NULL'
-        return "%s %s %s" % (self._column_name, self._data_type, null_word)
+        return "\"%s\" %s %s" % (self._column_name, self._data_type, null_word)
 
     @abstractmethod
     def convert_value_into_sql(self, new_value: Any) -> str:

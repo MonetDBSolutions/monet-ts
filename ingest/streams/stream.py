@@ -44,7 +44,7 @@ class BaseIOTStream(object):
         return ','.join([x.column_name() for x in self._columns.values() if x.is_tag()])
 
     @abstractmethod
-    def get_stream_table_sql_statement(self) -> str:  # insert for iot.webserverflushing table
+    def get_stream_table_sql_statement(self) -> str:  # insert for timetrails.webserverflushing table
         pass
 
     def get_table_id(self) -> str:  # for the delete statement
@@ -71,7 +71,7 @@ class BaseIOTStream(object):
                 'flushing': self.get_flushing_dictionary()}
 
     @abstractmethod
-    def _flush_data(self):
+    def flush_data(self, forced=False):
         pass
 
     def insert_values(self, new_data, base_tuple_counter: int) -> None:
@@ -105,7 +105,7 @@ class BaseIOTStream(object):
             raise StreamException({'type': TABLE_CONSTRAINTS_VALIDATION, 'message': errors})
 
         self._inserts.extend(new_inserts)
-        self._flush_data()
+        self.flush_data()
 
 
 class TupleBasedStream(BaseIOTStream):
@@ -124,23 +124,18 @@ class TupleBasedStream(BaseIOTStream):
     def get_flushing_dictionary(self) -> Dict[str, Any]:
         return {'base': 'tuple', 'interval': self._interval, 'tuples_inserted_per_basket': len(self._inserts)}
 
-    def get_stream_table_sql_statement(self) -> str:  # insert for iot.webserverflushing table
+    def get_stream_table_sql_statement(self) -> str:
         return str(TUPLE_BASED_STREAM) + ',' + str(self._interval) + ",NULL"
 
-    def _flush_data(self) -> None:
-        if len(self._inserts) > self._interval:
+    def flush_data(self, forced=False) -> None:
+        if forced or len(self._inserts) > self._interval:
             sql_columns = ','.join(self._inserts[:self._interval])
             self._connection.insert_points(self._schema_name, self._stream_name, sql_columns)
             del self._inserts[:self._interval]
 
 
 def time_based_flush(time_based_stream) -> None:
-    if len(time_based_stream.inserts) > 0:  # flush only when there are tuples in the baskets
-        sql_columns = ','.join(time_based_stream.inserts)
-        time_based_stream.connection.insert_points(time_based_stream.get_schema_name(),
-                                                   time_based_stream.get_stream_name(), sql_columns)
-        del time_based_stream.inserts[:]
-
+    time_based_stream.flush_data(forced=True)
     time_based_stream.upcoming_event = SCHEDULER.enter(time_based_stream.calc_time, 1, time_based_flush,
                                                        (time_based_stream,))
 
@@ -173,11 +168,14 @@ class TimeBasedStream(BaseIOTStream):
         return {'base': 'time', 'interval': self._interval, 'time_unit': self._time_unit,
                 'tuples_inserted_per_basket': len(self._inserts)}
 
-    def get_stream_table_sql_statement(self) -> str:  # insert for iot.webserverflushing table
+    def get_stream_table_sql_statement(self) -> str:
         return str(TIME_BASED_STREAM) + ',' + str(self._interval) + ',' + str(self._time_unit)
 
-    def _flush_data(self) -> None:
-        pass
+    def flush_data(self, forced=False) -> None:
+        if forced and len(self._inserts) > 0:
+            sql_columns = ','.join(self._inserts)
+            self._connection.insert_points(self._schema_name, self._stream_name, sql_columns)
+            del self._inserts[:]
 
 
 class AutoFlushedStream(BaseIOTStream):
@@ -195,10 +193,10 @@ class AutoFlushedStream(BaseIOTStream):
     def get_flushing_dictionary(self) -> Dict[str, Any]:
         return {'base': 'auto'}
 
-    def get_stream_table_sql_statement(self) -> str:  # insert for iot.webserverflushing table
+    def get_stream_table_sql_statement(self) -> str:
         return str(AUTO_BASED_STREAM) + ',NULL,NULL'
 
-    def _flush_data(self) -> None:
+    def flush_data(self, forced=False) -> None:
         sql_columns = ','.join(self._inserts)
         self._connection.insert_points(self._schema_name, self._stream_name, sql_columns)
         del self._inserts[:]

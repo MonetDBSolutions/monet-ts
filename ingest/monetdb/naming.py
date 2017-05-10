@@ -14,6 +14,7 @@ AUTO_BASED_STREAM = 3
 METRIC_SEPARATOR = '.'
 TIMETRAILS_SCHEMA = 'timetrails'
 TIMESTAMP_COLUMN_NAME = 'ticks'  # the timestamp column to be used by MonetDB
+DISCOVERED_STREAMS_INTERVAL_SIZE = 100
 
 
 def get_context_entry_name(schema_name: str, stream_name: str) -> str:

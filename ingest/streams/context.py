@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
 
 from ingest.monetdb.mapiconnection import PyMonetDBConnection
 from ingest.monetdb.naming import get_context_entry_name, get_schema_and_stream_name
@@ -62,6 +62,11 @@ class IOTStreams(object):
             new_stream.start_stream()
             self._context[concat_name] = new_stream
         return self._context[concat_name]
+
+    def force_flush_streams(self, streams: Set[str]) -> None:
+        filtered = {conc_name: self._context[conc_name] for conc_name in self._context if conc_name in streams}
+        for value in filtered.values():
+            value.flush_data(forced=True)
 
     def delete_existing_stream(self, validating_schema) -> None:
         schema_name = validating_schema['schema']

@@ -1,6 +1,6 @@
 from typing import List
 
-CHUNK_SIZE = 50
+CHUNK_SIZE = 100
 
 
 def read_chunk_lines(input_lines: str, chunk_size: int) -> List[str]:

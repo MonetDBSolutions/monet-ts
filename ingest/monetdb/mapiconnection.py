@@ -11,9 +11,10 @@ class PyMonetDBConnection(object):
         self._cursor = self._connection.cursor()
 
     def init_timetrails(self) -> None:
-        try:  # TODO CREATE IF NOT EXISTS
-            self._cursor.execute("CREATE SCHEMA timeseries")
-            self._cursor.execute("CREATE TABLE timeseries.webserverstreams (table_id INTEGER, base INTEGER, \"interval\" INTEGER NULL, unit INTEGER NULL)")
+        try:
+            stream_table = """CREATE TABLE IF NOT EXISTS timetrails.webserverstreams (table_id INTEGER, base INTEGER,
+            "interval" INTEGER, unit INTEGER)""".replace('\n', ' ')
+            self._cursor.execute(stream_table)
             self._connection.commit()
         except:
             self._connection.rollback()
@@ -23,21 +24,20 @@ class PyMonetDBConnection(object):
         self._connection.close()
 
     def get_database_streams(self) -> Tuple[Any, Any]:
-        try:  # TODO put back the WHERE type=4 and the left join
+        try:
             tables_sql_string = """SELECT tables."id", schemas."name" AS schema, tables."name" AS table, extras."base",
-                extras."interval", extras."unit" FROM (SELECT "id", "name", "schema_id" FROM sys.tables)
+                extras."interval", extras."unit" FROM (SELECT "id", "name", "schema_id" FROM sys.tables WHERE type=4)
                 AS tables INNER JOIN (SELECT "id", "name" FROM sys.schemas) AS schemas ON
                 (tables."schema_id"=schemas."id") INNER JOIN (SELECT "table_id", "base", "interval", "unit" FROM
-                timeseries.webserverstreams) AS extras ON (tables."id"=extras."table_id") ORDER BY tables."id" """\
+                timetrails.webserverstreams) AS extras ON (tables."id"=extras."table_id") ORDER BY tables."id" """\
                 .replace('\n', ' ')
             self._cursor.execute(tables_sql_string)
             tables = self._cursor.fetchall()
 
-            # TODO WHERE type=4
             columns_sql_string = """SELECT columns."id", columns."table_id", columns."name" AS column, columns."type",
                 columns."type_digits", columns."type_scale", columns."null" FROM (SELECT "id",
                 "table_id", "name", "type", "type_digits", "type_scale", "null", "number" FROM sys.columns)
-                AS columns INNER JOIN (SELECT "id" FROM sys.tables) AS tables ON
+                AS columns INNER JOIN (SELECT "id" FROM sys.tables WHERE type=4) AS tables ON
                 (tables."id"=columns."table_id") ORDER BY columns."table_id", columns."number" """.replace('\n', ' ')
             self._cursor.execute(columns_sql_string)
             columns = self._cursor.fetchall()
@@ -50,19 +50,13 @@ class PyMonetDBConnection(object):
 
     def create_stream(self, schema: str, stream: str, columns: str, flush_statement: str) -> str:
         try:
-            try:  # TODO CREATE SCHEMA IF NOT EXISTS
-                self._cursor.execute("CREATE SCHEMA %s" % schema)
-                self._connection.commit()
-            except:
-                self._connection.rollback()
-
-            # TODO put STREAM back!! -> CREATE STREAM TABLE
-            self._cursor.execute("CREATE TABLE %s.%s (%s)" % (schema, stream, columns))
+            self._cursor.execute("CREATE SCHEMA IF NOT EXISTS \"%s\"" % schema)
+            self._cursor.execute("CREATE STREAM TABLE \"%s\".\"%s\" (%s)" % (schema, stream, columns))
             self._cursor.execute("SELECT id FROM sys.schemas WHERE \"name\"='%s'" % schema)
             schema_id = self._cursor.fetchall()[0][0]
             self._cursor.execute("SELECT id FROM sys.tables WHERE schema_id=%s AND \"name\"='%s'" % (schema_id, stream))
             table_id = self._cursor.fetchall()[0][0]
-            self._cursor.execute("INSERT INTO timeseries.webserverstreams VALUES (%s,%s)" % (table_id, flush_statement))
+            self._cursor.execute("INSERT INTO timetrails.webserverstreams VALUES (%s,%s)" % (table_id, flush_statement))
 
             self._connection.commit()
             return table_id
@@ -72,15 +66,15 @@ class PyMonetDBConnection(object):
 
     def delete_stream(self, schema: str, table: str, stream_id: str) -> None:
         try:
-            self._cursor.execute("DROP TABLE %s.%s" % (schema, table))
-            self._cursor.execute("DELETE FROM timeseries.webserverstreams WHERE table_id='%s'" % stream_id)
+            self._cursor.execute("DROP TABLE \"%s\".\"%s\"" % (schema, table))
+            self._cursor.execute("DELETE FROM timetrails.webserverstreams WHERE table_id='%s'" % stream_id)
             self._connection.commit()
         except BaseException as ex:
             self._connection.rollback()
             raise StreamException({'type': MAPI_CONNECTION, 'message': ex.__str__()})
 
     def insert_points(self, schema: str, stream: str, points: str) -> None:
-        insert_string = "INSERT INTO %s.%s VALUES %%s" % (schema, stream)
+        insert_string = "INSERT INTO \"%s\".\"%s\" VALUES %%s" % (schema, stream)
         try:
             self._cursor.execute(insert_string % points)
             self._connection.commit()

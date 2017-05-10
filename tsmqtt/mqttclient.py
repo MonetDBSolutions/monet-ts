@@ -1,46 +1,45 @@
-import asyncio
-
 from hbmqtt.client import MQTTClient, ClientException
 from hbmqtt.mqtt.constants import QOS_2
 
-from ingest.monetdb.naming import THREAD_POOL
-from ingest.streams.context import get_streams_context
-from ingest.streams.streamexception import StreamException
-from ingest.tsinfluxline import influxdblineparser
-from ingest.tsinfluxline.linereader import read_chunk_lines, CHUNK_SIZE
+from ingest.tsinfluxline.influxdblineparser import add_influxdb_lines, discovery_influxdb_lines
+from ingest.tsjson.jsonparser import add_json_lines
 
+JSON_TOPIC = '/json'
+INFLUXDB_TOPIC = '/influxdb'
+DISCOVERY_TOPIC = '/discovery'
+
+SUBSCRIPTION_TOPICS = [JSON_TOPIC, INFLUXDB_TOPIC, DISCOVERY_TOPIC]
+QOS_VALUES = list(map(lambda x: (x, QOS_2), SUBSCRIPTION_TOPICS))
+
+ANSWER_TOPIC = '/answer'
 
 async def mqttclient_coro():
     client = MQTTClient()
     await client.connect('mqtt://localhost:1883/')
-    await client.subscribe([('/influxdb', QOS_2), ])
+    await client.subscribe(QOS_VALUES)
     try:
         while True:
-            base_tuple_counter = 0
-            errors = []
             message = await client.deliver_message()
             packet = message.publish_packet
+            topic_name = packet.variable_header.topic_name
+            decoded_packet_data = packet.payload.data.decode('utf-8')
 
-            for lines in read_chunk_lines(packet.payload.data.decode("utf-8"), CHUNK_SIZE):
-                try:
-                    grouped_streams = influxdblineparser.parse_influxdb_line(lines, base_tuple_counter)
-                    for key, values in grouped_streams.items():
-                        try:  # TODO check UTF-8 strings?
-                            stream = get_streams_context().get_existing_metric(key)
-                            await asyncio.wrap_future(THREAD_POOL.submit(stream.insert_values, values['values'],
-                                                                         base_tuple_counter))
-                        except StreamException as ex:
-                            errors.append(ex.args[0]['message'])
-                except StreamException as ex:
-                    errors.append(ex.args[0]['message'])
-
-                base_tuple_counter += CHUNK_SIZE
+            if topic_name == INFLUXDB_TOPIC:
+                errors = await add_influxdb_lines(decoded_packet_data)
+            elif topic_name == DISCOVERY_TOPIC:
+                errors = await discovery_influxdb_lines(decoded_packet_data)
+            elif topic_name == JSON_TOPIC:
+                errors = await add_json_lines(decoded_packet_data)
+            else:
+                errors = ['Unknown topic %s!' % topic_name]
 
             if len(errors) > 0:
-                await client.publish('answer', errors.__str__().encode('utf-8'), qos=QOS_2)
+                printing = '[' + ','.join(errors) + ']'
+                await client.publish(ANSWER_TOPIC, printing.encode('utf-8'), qos=QOS_2)
             else:
-                await client.publish('answer', 'OK'.encode('utf-8'), qos=QOS_2)
+                await client.publish(ANSWER_TOPIC, 'OK'.encode('utf-8'), qos=QOS_2)
 
-    except ClientException:
-        await client.unsubscribe(['/influxdb'])
+    except ClientException as ex:
+        print("An error occurred in the Guardian MQTT client: %s", ex.__str__())
+        await client.unsubscribe(SUBSCRIPTION_TOPICS)
         await client.disconnect()
