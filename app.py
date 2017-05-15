@@ -6,7 +6,7 @@ import socket
 import sys
 
 from ingest.streams.context import init_streams_context
-from settings.settings import DEPLOYMENT, PRODUCTION
+from settings.settings import DEPLOYMENT_STAGE, PRODUCTION
 from settings.ingestservers import init_servers
 
 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # parser.add_argument('-h', '--host', type=check_ipv4_address, nargs='?', default='0.0.0.0',
     #                    help='Server host (default: 0.0.0.0)', metavar='HOST')
     parser.add_argument('-p', '--port', type=check_positive_int, nargs='?', default=8000,
-                        help='Server port (default: 8000)', metavar='PORT')
+                        help='Guardian port (default: 8000)', metavar='PORT')
     parser.add_argument('-dh', '--dhost', nargs='?', default='127.0.0.1',
                         help='MonetDB database host (default: 127.0.0.1)', metavar='HOST')
     parser.add_argument('-dp', '--dport', type=check_positive_int, nargs='?', default=50000,
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         parser.print_help()
         sys.exit(0)
 
-    if DEPLOYMENT != PRODUCTION:
+    if DEPLOYMENT_STAGE != PRODUCTION:
         con_password = 'monetdb'
     else:
         con_password = getpass.getpass(prompt="Insert password for user " + args['user'] + ":")

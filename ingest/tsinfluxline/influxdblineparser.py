@@ -1,5 +1,6 @@
 import antlr4
 import asyncio
+import threading
 
 from typing import Any, Dict, List
 
@@ -11,6 +12,10 @@ from ingest.tsinfluxline.grammar.influxdbParser import influxdbParser
 from ingest.tsinfluxline.guardianlistener import GuardianListener
 from ingest.tsinfluxline.linereader import read_chunk_lines, CHUNK_SIZE
 
+LOCAL_DATA = threading.local()
+LOCAL_DATA.walker = antlr4.ParseTreeWalker()
+LOCAL_DATA.listener = GuardianListener(0)
+
 
 def _parse_influxdb_line(line: str, base_tuple_counter: int) -> Dict[str, Any]:
     try:
@@ -19,12 +24,11 @@ def _parse_influxdb_line(line: str, base_tuple_counter: int) -> Dict[str, Any]:
         parser = influxdbParser(stream)
 
         tree = parser.lines()
-        printer = GuardianListener(base_tuple_counter)
-        walker = antlr4.ParseTreeWalker()
-        walker.walk(printer, tree)
+        LOCAL_DATA.listener.reset_values(base_tuple_counter)
+        LOCAL_DATA.walker.walk(LOCAL_DATA.listener, tree)
     except BaseException as ex:
         raise StreamException({'type': INFLUXDB_LINE_INSERT_VIOLATION, 'message': ex.__str__()})
-    return printer.get_grouped_streams()
+    return LOCAL_DATA.listener.get_grouped_streams()
 
 
 async def add_influxdb_lines(lines: str) -> List[str]:

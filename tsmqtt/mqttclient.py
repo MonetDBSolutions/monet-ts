@@ -37,7 +37,7 @@ async def mqttclient_coro():
                 printing = '[' + ','.join(errors) + ']'
                 await client.publish(ANSWER_TOPIC, printing.encode('utf-8'), qos=QOS_2)
             else:
-                await client.publish(ANSWER_TOPIC, 'OK'.encode('utf-8'), qos=QOS_2)
+                await client.publish(ANSWER_TOPIC, 'k'.encode('utf-8'), qos=QOS_2)
 
     except ClientException as ex:
         print("An error occurred in the Guardian MQTT client: %s", ex.__str__())

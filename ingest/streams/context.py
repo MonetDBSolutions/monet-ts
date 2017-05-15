@@ -10,7 +10,7 @@ from ingest.streams.streamexception import StreamException, CONTEXT_LOOKUP
 
 
 class IOTStreams(object):
-    """ The Streams context held in the guardian"""
+    """The Streams context held in the guardian"""
 
     def __init__(self, con_hostname: str, con_port: int, con_user: str, con_password: str, con_database: str):
         self._context = OrderedDict()  # dictionary of schema_name + METRIC_SEPARATOR + stream_name -> IOTStream

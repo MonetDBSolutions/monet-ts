@@ -66,8 +66,7 @@ class BaseIOTStream(object):
         pass
 
     def get_data_dictionary(self):
-        return {'schema': self._schema_name, 'stream': self._stream_name,
-                'columns': [OrderedDict((value.to_json_representation())) for value in self._columns.values()],
+        return {'columns': [OrderedDict((value.to_json_representation())) for value in self._columns.values()],
                 'flushing': self.get_flushing_dictionary()}
 
     @abstractmethod

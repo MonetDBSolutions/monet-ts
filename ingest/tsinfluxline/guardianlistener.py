@@ -12,6 +12,12 @@ class GuardianListener(influxdbListener):
         self._tag_number = 0
         self._value_number = 0
 
+    def reset_values(self, base_tuple_counter):
+        self._grouped_streams = {}
+        self._line_number = base_tuple_counter
+        self._tag_number = 0
+        self._value_number = 0
+
     def get_grouped_streams(self):
         return self._grouped_streams
 

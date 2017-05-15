@@ -9,17 +9,17 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # Deployment Configuration
 
-SOLO = 1
-PRODUCTION = 2
-DEV = 3
-STAGING = 4
+PRODUCTION = 1
+DEVELOPMENT = 2
 
-STAGES = {'SOLO': SOLO, 'PRODUCTION': PRODUCTION, 'DEV': DEV, 'STAGING': STAGING}
+STAGE_ENV = 'GUARDIAN_DEPLOYMENT'
 
-if 'DEPLOYMENT_TYPE' in os.environ:
-    DEPLOYMENT = STAGES.get(os.environ['DEPLOYMENT_TYPE'].upper(), 'SOLO')
+STAGES = {'PRODUCTION': PRODUCTION, 'DEVELOPMENT': DEVELOPMENT}
+
+if STAGE_ENV in os.environ:
+    DEPLOYMENT_STAGE = STAGES.get(os.environ[STAGE_ENV].upper(), 'DEVELOPMENT')
 else:
-    DEPLOYMENT = SOLO
+    DEPLOYMENT_STAGE = DEVELOPMENT
 
 # See PEP 391 and logconfig for formatting help.  Each section of LOGGERS
 # will get merged into the corresponding section of log_settings.py.
@@ -32,13 +32,11 @@ LOGGERS = {
     },
 }
 
-if DEPLOYMENT != PRODUCTION:
+if DEPLOYMENT_STAGE != PRODUCTION:
     LOG_LEVEL = logging.DEBUG
 else:
     LOG_LEVEL = logging.INFO
 
-USE_SYSLOG = DEPLOYMENT != SOLO
-SYSLOG_TAG = "boilerplate"
-SYSLOG_FACILITY = logging.handlers.SysLogHandler.LOG_LOCAL2
+USE_SYSLOG = DEPLOYMENT_STAGE != DEVELOPMENT
 
-logconfig.initialize_logging(SYSLOG_TAG, SYSLOG_FACILITY, LOGGERS, LOG_LEVEL, USE_SYSLOG)
+logconfig.initialize_logging("boilerplate", logging.handlers.SysLogHandler.LOG_LOCAL2, LOGGERS, LOG_LEVEL, USE_SYSLOG)
