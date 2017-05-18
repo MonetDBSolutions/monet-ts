@@ -82,12 +82,12 @@ def initialize_logging(syslog_tag, syslog_facility, loggers, log_level=logging.I
             'null': {
                 '()': NullHandler,
             },
-            'syslog': {
-                '()': logging.handlers.SysLogHandler,
-                'facility': syslog_facility,
-                'address': syslog_device,
-                'formatter': 'prod',
-            },
+            # 'syslog': {
+            #     '()': logging.handlers.SysLogHandler,
+            #     'facility': syslog_facility,
+            #     'address': syslog_device,
+            #     'formatter': 'prod',
+            # },
         },
         'loggers': {
         }

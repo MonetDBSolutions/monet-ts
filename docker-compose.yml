@@ -1,0 +1,17 @@
+version: '2'
+services:
+  guardian:
+    build: .
+    command: python app.py -dh 0.0.0.0 -dp 50000
+    expose:
+      - "9011"
+      - "1833"
+    ports:
+      - "9011:9011"
+      - "1833:1833"
+    volumes:
+      - .:/home/guardian
+  monetdb:
+    expose:
+      - "50000"
+    image: "monetdb/monetdb:timetrails"
