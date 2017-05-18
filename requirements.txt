@@ -1,4 +1,12 @@
-antlr4-python3-runtime==4.7.0
+antlr4-python3-runtime==4.7
+docopt==0.6.2
 hbmqtt==0.8
 jsonschema==2.6.0
+passlib==1.7.1
+pymonetdb==1.0.5
+PyYAML==3.12
+six==1.10.0
+termcolor==1.1.0
 tornado==4.5.1
+transitions==0.2.5
+websockets==3.3

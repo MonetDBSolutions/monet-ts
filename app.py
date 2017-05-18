@@ -4,6 +4,8 @@ import argparse
 import getpass
 import socket
 import sys
+from termcolor import colored
+from ingest.streams.streamexception import StreamException
 
 from ingest.streams.context import init_streams_context
 from settings.settings import DEPLOYMENT_STAGE, PRODUCTION
@@ -28,8 +30,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='The Guardian!', epilog="There might exist bugs!", add_help=False)
     # parser.add_argument('-h', '--host', type=check_ipv4_address, nargs='?', default='0.0.0.0',
     #                    help='Server host (default: 0.0.0.0)', metavar='HOST')
-    parser.add_argument('-p', '--port', type=check_positive_int, nargs='?', default=8000,
-                        help='Guardian port (default: 8000)', metavar='PORT')
+    parser.add_argument('-p', '--port', type=check_positive_int, nargs='?', default=9011,
+                        help='Guardian port (default: 9011)', metavar='PORT')
     parser.add_argument('-dh', '--dhost', nargs='?', default='127.0.0.1',
                         help='MonetDB database host (default: 127.0.0.1)', metavar='HOST')
     parser.add_argument('-dp', '--dport', type=check_positive_int, nargs='?', default=50000,
@@ -53,5 +55,9 @@ if __name__ == "__main__":
     else:
         con_password = getpass.getpass(prompt="Insert password for user " + args['user'] + ":")
 
-    init_streams_context(args['dhost'], args['dport'], args['user'], con_password, args['database'])
+    try:
+        init_streams_context(args['dhost'], args['dport'], args['user'], con_password, args['database'])
+        print(colored('Init stream context SUCCESS ...', 'green'))
+    except StreamException as ex:
+        print(colored('Fail to initialize stream context!', 'red'))
     init_servers(args['port'], 1833)
