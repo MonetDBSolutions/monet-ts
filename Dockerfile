@@ -3,12 +3,6 @@ MAINTAINER Svetlin Stalinov, svetlin.stalinov@monetdbsolutions.com
 
 EXPOSE 9011 1833
 
-# Update & upgrade
-# RUN dnf update -y && \
-#     dnf upgrade -y
-
-# RUN dnf install -y python3
-
 ADD . /home/guardian
 
 ENV GUARDIAN_HOME=/home/guardian

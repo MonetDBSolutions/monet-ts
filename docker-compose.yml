@@ -1,8 +1,14 @@
 version: '2'
 services:
+  db:
+    expose:
+      - "50000"
+    image: "monetdb/monetdb:time-trails-db"
   guardian:
     build: .
-    command: python app.py -dh 0.0.0.0 -dp 50000
+    depends_on:
+      - "db"
+    command: ["./docker-scripts/wait-for-it.sh", "db:50000", "--", "python", "app.py"]
     expose:
       - "9011"
       - "1833"
@@ -11,7 +17,5 @@ services:
       - "1833:1833"
     volumes:
       - .:/home/guardian
-  monetdb:
-    expose:
-      - "50000"
-    image: "monetdb/monetdb:timetrails"
+    extra_hosts:
+      - "localhost:127.0.0.1"

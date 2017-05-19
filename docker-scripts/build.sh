@@ -12,3 +12,4 @@ docker build \
     --no-cache=true .
 docker tag monetdb/guardian:${BRANCH} monetdb/guardian:latest
 
+echo 'Done'
