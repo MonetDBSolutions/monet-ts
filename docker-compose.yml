@@ -1,14 +1,29 @@
 version: '2'
 services:
-  db:
+  monetdb:
     expose:
       - "50000"
+    ports:
+      - "50000:50000" 
     image: "monetdb/monetdb:time-trails-db"
+    networks:
+      timetrails:
+        aliases:
+          - db
+  grafana:
+    image: "monetdb/grafana"
+    depends_on:
+      - "guardian"
+    expose:
+      - "3000"
+    ports:
+      - "3000:3000"  
+    networks:
+      - timetrails
   guardian:
     build: .
     depends_on:
-      - "db"
-    command: ["./docker-scripts/wait-for-it.sh", "db:50000", "--", "python", "app.py"]
+      - "monetdb"
     expose:
       - "9011"
       - "1833"
@@ -17,5 +32,8 @@ services:
       - "1833:1833"
     volumes:
       - .:/home/guardian
-    extra_hosts:
-      - "localhost:127.0.0.1"
+    networks:
+      - timetrails
+networks:
+  timetrails:
+

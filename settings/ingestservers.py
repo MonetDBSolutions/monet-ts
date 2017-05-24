@@ -2,16 +2,16 @@ import asyncio
 import logging
 import tornado.web, tornado.httpserver, tornado.ioloop, tornado.platform
 
-from tshttp import guardian_application
+# from tshttp import guardian_application
 from tsmqtt.mqttbroker import ts_broker_start
 from tsmqtt.mqttclient import mqttclient_coro
 
 logger = logging.getLogger('MonetDBTS ' + __name__)
 
 
-def init_servers(tornado_port, broker_port):
+def init_servers(tornado_port, broker_port, app):
     tornado.platform.asyncio.AsyncIOMainLoop().install()
-    guardian_application.listen(tornado_port)
+    app.listen(tornado_port, '0.0.0.0')
     http_log = "Monet Time Stream HTTP server listening on port: " + str(tornado_port)
     logger.info(http_log)
     print(http_log)

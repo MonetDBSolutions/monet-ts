@@ -7,14 +7,11 @@ logger = logging.getLogger('boilerplate.' + __name__)
 
 
 class QueryHandler(TSBaseJSONHandler):
-
+    def initialize(self, dbConnection):
+        self.dbConnection = dbConnection
     def prepare(self):
-        self.dbConnection = pymonetdb.connect(
-            username="monetdb",
-            password="monetdb",
-            hostname="localhost",
-            database="timeseries")
-    
+        print("[QueryHandler] -- received request")
+        self.dbConnection.open()
     def get(self):
         self.setCORSHeaders()
         try:
@@ -39,7 +36,7 @@ class QueryHandler(TSBaseJSONHandler):
 
     def db_fetch(self):
         results = []
-        cursor = self.dbConnection.cursor()
+        cursor = self.dbConnection._cursor
         queries = self.get_query_argument('q').split(';')
         for q in queries:
             print(q)
@@ -59,5 +56,6 @@ class QueryHandler(TSBaseJSONHandler):
     def setCORSHeaders(self):
         self.set_header("Access-Control-Allow-Origin", "*")
         self.set_header("Access-Control-Allow-Methods", "POST")
+        self.set_header("Access-Control-Allow-Methods", "GET")
         self.set_header("Access-Control-Allow-Headers", "accept, content-type")
 

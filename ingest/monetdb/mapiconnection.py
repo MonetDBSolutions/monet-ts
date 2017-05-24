@@ -6,8 +6,20 @@ from ingest.streams.streamexception import StreamException, MAPI_CONNECTION
 
 class PyMonetDBConnection(object):
     def __init__(self, hostname: str, port: int, user_name: str, user_password: str, database: str) -> None:
-        self._connection = connect(hostname=hostname, port=port, username=user_name, password=user_password,
-                                   database=database, autocommit=False)
+        self.hostname = hostname
+        self.port = port
+        self.user_name = user_name
+        self.user_password = user_password
+        self.database = database
+        self.open()
+
+    def open(self):
+        self._connection = connect(
+            hostname=self.hostname,
+            port=self.port,
+            username=self.user_name,
+            password=self.user_password,
+            database=self.database, autocommit=False)
         self._cursor = self._connection.cursor()
 
     def init_timetrails(self) -> None:
