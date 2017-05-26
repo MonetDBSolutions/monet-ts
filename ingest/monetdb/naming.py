@@ -1,25 +1,21 @@
+import datetime
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 
 # Start the Thread pool with the number of cores like in MonetDB :)
-from typing import List
-
 THREAD_POOL = ThreadPoolExecutor(multiprocessing.cpu_count())
 
-# Identifiers for the stream types
-TUPLE_BASED_STREAM = 1
-TIME_BASED_STREAM = 2
-AUTO_BASED_STREAM = 3
-
+DATABASE_NAME = 'timeseries'
+DATABASE_SCHEMA = 'timetrails'
 METRIC_SEPARATOR = '.'
-TIMETRAILS_SCHEMA = 'timetrails'
 TIMESTAMP_COLUMN_NAME = 'ticks'  # the timestamp column to be used by MonetDB
-DISCOVERED_STREAMS_INTERVAL_SIZE = 100
+
+INFLUXDB_TEXT_TYPE = 1
+INFLUXDB_BOOL_TYPE = 2
+INFLUXDB_INTEGER_TYPE = 3
+INFLUXDB_FLOAT_TYPE = 4
+INFLUXDB_TIMESTAMP_TYPE = 5
 
 
-def get_context_entry_name(schema_name: str, stream_name: str) -> str:
-    return schema_name + METRIC_SEPARATOR + stream_name
-
-
-def get_schema_and_stream_name(concat_name: str) -> List[str]:
-    return concat_name.split(METRIC_SEPARATOR)[:2]
+def get_default_timestamp_value():
+    return datetime.datetime.now().isoformat()

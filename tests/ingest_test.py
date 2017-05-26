@@ -44,7 +44,6 @@ class IngestTest(unittest.TestCase):
         {
             "schema": "sys",
             "stream": "testing",
-            "flushing": {"base": "auto"},
             "columns": [
                 {"name": "a", "type": "int", "nullable": true},
                 {"name": "b", "type": "text", "nullable": false}
@@ -69,31 +68,25 @@ class IngestTest(unittest.TestCase):
 
     def test_c_get_one(self):
         result_string = json.loads("""{
+          "schema": "sys",
+          "stream": "testing",
           "columns": [
             {
               "name": "a",
-              "tag": false,
               "type": "int",
               "nullable": true
             },
             {
               "name": "b",
-              "tag": false,
               "type": "text",
               "nullable": false
             },
             {
               "name": "ticks",
-              "tag": false,
-              "type": "timestamp with time zone",
+              "type": "timestamptz",
               "nullable": true
             }
-          ],
-          "flushing": {
-            "base": "auto"
-          },
-          "schema": "sys",
-          "stream": "testing"
+          ]
         }""")
         IngestTest.HTTP_Client.request('GET', '/stream/sys/testing')
         response = IngestTest.HTTP_Client.getresponse()
@@ -103,36 +96,30 @@ class IngestTest(unittest.TestCase):
 
     def test_d_get_all(self):
         result_string = json.loads("""{
+          "streams_count": 1,
           "streams_listing": [
             {
+              "schema": "sys",
+              "stream": "testing",
               "columns": [
                 {
-                  "nullable": true,
-                  "tag": false,
                   "name": "a",
-                  "type": "int"
+                  "type": "int",
+                  "nullable": true
                 },
                 {
-                  "nullable": false,
-                  "tag": false,
                   "name": "b",
-                  "type": "text"
+                  "type": "text",
+                  "nullable": false
                 },
                 {
-                  "nullable": true,
-                  "tag": false,
                   "name": "ticks",
-                  "type": "timestamp with time zone"
+                  "type": "timestamptz",
+                  "nullable": true
                 }
-              ],
-              "stream": "testing",
-              "flushing": {
-                "base": "auto"
-              },
-              "schema": "sys"
+              ]
             }
-          ],
-          "streams_count": 1
+          ]
         }""")
         IngestTest.HTTP_Client.request('GET', '/context')
         response = IngestTest.HTTP_Client.getresponse()

@@ -1,52 +1,28 @@
-from collections import OrderedDict, defaultdict
-from typing import Dict, Any, List
-from jsonschema import Draft4Validator, FormatChecker
+from typing import Dict, Any
 
-from ingest.monetdb.mapiconnection import PyMonetDBConnection
-from ingest.monetdb.naming import get_context_entry_name, TUPLE_BASED_STREAM, TIME_BASED_STREAM, AUTO_BASED_STREAM, \
-    TIMESTAMP_COLUMN_NAME, DISCOVERED_STREAMS_INTERVAL_SIZE
-from ingest.streams.datatypes import TextType, LimitedTextType, IntegerType, FloatType, DateType, TimeType, \
-    TimestampType, BooleanType
-from ingest.streams.stream import TupleBasedStream, TimeBasedStream, AutoFlushedStream, BaseIOTStream
-from ingest.streams.streamexception import StreamException, DATABASE_SYNCHRONIZATION, STREAM_CREATION
-from ingest.tsjson.jsonschemas import UNBOUNDED_TEXT_INPUTS, BOUNDED_TEXT_INPUTS, INTEGER_INPUTS, DATE_INPUTS, \
-    BOOLEAN_INPUTS, FLOATING_POINT_PRECISION_INPUTS, TIME_INPUTS, TIMESTAMP_INPUTS, TIMED_FLUSH_IDENTIFIER, \
-    TUPLE_FLUSH_IDENTIFIER, TIME_WITH_TIMEZONE_TYPE_INTERNAL, TIMESTAMP_WITH_TIMEZONE_TYPE_INTERNAL, \
-    TIME_WITH_TIMEZONE_TYPE_EXTERNAL, TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL, AUTO_FLUSH_IDENTIFIER, \
-    INTERVAL_TYPES_INTERNAL, TEXT_INPUT, BOOLEAN_INPUT, BIGINTEGER_INPUT, DOUBLE_PRECISION_INPUT
-
-JSON_SWITCHER = [{'types': UNBOUNDED_TEXT_INPUTS, 'class': TextType},
-                 {'types': BOUNDED_TEXT_INPUTS, 'class': LimitedTextType},
-                 {'types': BOOLEAN_INPUTS, 'class': BooleanType},
-                 {'types': INTEGER_INPUTS + INTERVAL_TYPES_INTERNAL, 'class': IntegerType},
-                 {'types': FLOATING_POINT_PRECISION_INPUTS, 'class': FloatType},
-                 {'types': DATE_INPUTS, 'class': DateType},
-                 {'types': TIME_INPUTS, 'class': TimeType},
-                 {'types': TIMESTAMP_INPUTS, 'class': TimestampType}]
-
-INFLUXDB_SWITCHER = [{'instance': bool, 'class': BooleanType, 'type': BOOLEAN_INPUT},
-                     {'instance': int, 'class': IntegerType, 'type': BIGINTEGER_INPUT},
-                     {'instance': float, 'class': FloatType, 'type': DOUBLE_PRECISION_INPUT},
-                     {'instance': str, 'class': TextType, 'type': TEXT_INPUT}]
+from ingest.monetdb.mapiconnection import get_mapi_connection
+from ingest.monetdb.naming import TIMESTAMP_COLUMN_NAME, INFLUXDB_TEXT_TYPE, INFLUXDB_BOOL_TYPE, INFLUXDB_INTEGER_TYPE,\
+    INFLUXDB_FLOAT_TYPE
+from ingest.streams.streamexception import StreamException, JSON_SCHEMA_CREATE_VIOLATION, INFLUXDB_LINE_INSERT_VIOLATION
+from ingest.tsjson.jsonschemas import TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL, TEXT_INPUT, BOOLEAN_INPUT,\
+    BIGINTEGER_INPUT, DOUBLE_PRECISION_INPUT
 
 
-INTERVALS_DICTIONARY = {1: "interval year", 2: "interval year to month", 3: "interval month", 4: "interval day",
-                        5: "interval day to hour", 6: "interval day to minute", 7: "interval day to second",
-                        8: "interval hour", 9: "interval hour to minute", 10: "interval hour to second",
-                        11: "interval minute", 12: "interval minute to second", 13: "interval second"}
-
-TIME_FLUSH_DICTIONARY = {'s': 1, 'm': 2, 'h': 3}
+def _create_stream_sql(column_name: str, data_type: str, is_nullable: bool, limit: int=None) -> str:
+    null_word = 'NOT NULL' if not is_nullable else 'NULL'
+    data_type_real = data_type + "(" + str(limit) + ")" if limit is not None else data_type
+    return "\"%s\" %s %s" % (column_name, data_type_real, null_word)
 
 
-def validate_json_schema_and_create_stream(connection: PyMonetDBConnection, schema: Dict[Any, Any]) -> BaseIOTStream:
-    validated_columns = OrderedDict()  # dictionary of name -> data_types
+def create_json_stream(schema: Dict[Any, Any]) -> None:
+    validated_columns = []
+    found_columns = []
     errors = []
 
     for column in schema['columns']:  # create the data types dictionary
-        next_type = column['type']
         next_name = column['name']
 
-        if next_name in validated_columns:
+        if next_name in found_columns:
             errors.append("The column %s is duplicated?" % next_name)
             continue
 
@@ -54,205 +30,62 @@ def validate_json_schema_and_create_stream(connection: PyMonetDBConnection, sche
             errors.append("The column name %s is reserved?" % TIMESTAMP_COLUMN_NAME)
             continue
 
-        for entry in JSON_SWITCHER:  # allocate the proper type wrapper
-            if next_type in entry['types']:
-                try:
-                    validated_columns[next_name] = entry['class'](**column)  # pass the json entry as kwargs
-                except BaseException as ex:
-                    errors.append(
-                        "Reflection error while creating the column: %s Details: %s" % (next_name, ex.__str__()))
-                break
+        found_columns.extend(next_name)
+        validated_columns.append(_create_stream_sql(column['name'], column['type'], column['nullable'],
+                                                    column.get('nullable', None)))
 
-    # Add the timestamp column!
-    validated_columns[TIMESTAMP_COLUMN_NAME] = TimestampType(**{'name': TIMESTAMP_COLUMN_NAME,
-                                                                'type': TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL,
-                                                                'nullable': True, 'tag': False})
+    if 'tags' in schema:
+        for tag in schema['tags']:
+            if tag in found_columns:
+                errors.append("The column %s is duplicated?" % tag)
+                continue
+
+            found_columns.extend(tag)
+            validated_columns.append(_create_stream_sql(tag, TEXT_INPUT, False, None))
+
     if len(errors) > 0:
-        raise StreamException({'type': STREAM_CREATION, 'message': errors})
+        raise StreamException({'type': JSON_SCHEMA_CREATE_VIOLATION, 'message': errors.__str__()})
 
-    properties = OrderedDict()
-    req_fields = []
-
-    if "tags" in schema:
-        for tag_entry in schema["tags"]:
-            validated_columns[tag_entry] = TextType(**{'name': tag_entry, 'type': TEXT_INPUT,
-                                                       'nullable': True, 'tag': True})
-
-    for key, value in validated_columns.items():
-        value.add_json_schema_entry(properties)  # append new properties entry
-        if not value.is_nullable():  # check if it's required or not
-            req_fields.append(key)
-
-    json_schema = Draft4Validator({
-        "title": "JSON schema to validate _inserts in stream " + schema['schema'] + "." + schema['stream'],
-        "description": "Validate the inserted properties", "$schema": "http://json-schema.org/draft-04/schema#",
-        "id": "http://monetdb.com/schemas/" + schema['schema'] + "." + schema['stream'] + ".json", "type": "array",
-        "minItems": 1, "items": {"type": "object", "properties": properties, "required": req_fields,
-                                 "additionalProperties": False}
-    }, format_checker=FormatChecker())
-
-    flushing_object = schema['flushing']  # check the flush method
-
-    if flushing_object['base'] == TIMED_FLUSH_IDENTIFIER:
-        res = TimeBasedStream(schema_name=schema['schema'], stream_name=schema['stream'], columns=validated_columns,
-                              json_validation_schema=json_schema, connection=connection, table_id="",
-                              interval=flushing_object['interval'],
-                              time_unit=TIME_FLUSH_DICTIONARY[flushing_object['unit']])
-    elif flushing_object['base'] == TUPLE_FLUSH_IDENTIFIER:
-        res = TupleBasedStream(schema_name=schema['schema'], stream_name=schema['stream'], columns=validated_columns,
-                               json_validation_schema=json_schema, connection=connection, table_id="",
-                               interval=flushing_object['interval'])
-    elif flushing_object['base'] == AUTO_FLUSH_IDENTIFIER:
-        res = AutoFlushedStream(schema_name=schema['schema'], stream_name=schema['stream'], columns=validated_columns,
-                                json_validation_schema=json_schema, connection=connection, table_id="")
-    else:
-        raise StreamException({'type': STREAM_CREATION,
-                               'message': "The stream's flushing is neither auto, tuple or time based?"})
-    return res
+    validated_columns.append(_create_stream_sql(TIMESTAMP_COLUMN_NAME, TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL, True, None))
+    get_mapi_connection().create_stream(schema['schema'], schema['stream'], ','.join(validated_columns))
 
 
-def create_stream_from_influxdb(connection: PyMonetDBConnection, schema: str, stream: str, tags: List[str],
-                                new_values: Dict[str, Any]) -> BaseIOTStream:
-    validated_columns = OrderedDict()  # dictionary of name -> data_types
+def delete_json_stream(schema: Dict[Any, Any]) -> None:
+    get_mapi_connection().delete_stream(schema['schema'], schema['stream'])
+
+
+INFLUXDB_SWITCHER = {INFLUXDB_BOOL_TYPE: BOOLEAN_INPUT, INFLUXDB_INTEGER_TYPE: BIGINTEGER_INPUT,
+                     INFLUXDB_FLOAT_TYPE: DOUBLE_PRECISION_INPUT, INFLUXDB_TEXT_TYPE: TEXT_INPUT}
+
+
+def create_stream_from_influxdb(metric: str, column: Dict[str, Dict[str, Any]]) -> None:
+    validated_columns = []
+    found_columns = []
     errors = []
 
-    for key, value in new_values.items():  # create the data types dictionary
+    for key, value in column.items():  # create the data types dictionary
         if key in validated_columns:
             errors.append("The column %s is duplicated?" % key)
             continue
 
         if key == TIMESTAMP_COLUMN_NAME:
-            validated_columns[key] = TimestampType(**{'name': TIMESTAMP_COLUMN_NAME,
-                                                      'type': TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL,
-                                                      'nullable': True, 'tag': False})
+            errors.append("The column name %s is reserved?" % TIMESTAMP_COLUMN_NAME)
             continue
 
-        found_type = False
-        if key in tags:
-            validated_columns[key] = TextType(**{'name': key, 'type': TEXT_INPUT, 'nullable': False, 'tag': True})
-            found_type = True
+        found_columns.append(key)
+
+        if value['isTag']:
+            validated_columns.append(_create_stream_sql(key, TEXT_INPUT, False, None))
         else:
-            for entry in INFLUXDB_SWITCHER:  # allocate the proper type wrapper
-                if type(value) == entry['instance']:
-                    try:
-                        validated_columns[key] = entry['class'](**{'name': key, 'type': entry['type'],
-                                                                   'nullable': False, 'tag': key in tags})
-                    except BaseException as ex:
-                        errors.append(
-                            "Reflection error while creating the column: %s Details: %s" % (key, ex.__str__()))
-                    found_type = True
-                    break
+            next_type = INFLUXDB_SWITCHER.get(value['isTag'], TEXT_INPUT)
+            validated_columns.append(_create_stream_sql(key, next_type, True, None))
 
-        if not found_type:
-            raise StreamException({'type': STREAM_CREATION,
-                                   'message': "Fatal error: The column %s did not match any regular expression!" % key})
-
-    properties = OrderedDict()
-    json_schema = Draft4Validator({
-        "title": "JSON schema to validate _inserts in stream " + schema + "." + stream,
-        "description": "Validate the inserted properties", "$schema": "http://json-schema.org/draft-04/schema#",
-        "id": "http://monetdb.com/schemas/" + schema + "." + stream + ".json", "type": "array",
-        "minItems": 1, "items": {"type": "object", "properties": properties, "required": properties.keys(),
-                                 "additionalProperties": False}
-    }, format_checker=FormatChecker())
-
-    return TupleBasedStream(schema_name=schema, stream_name=stream, columns=validated_columns,
-                            json_validation_schema=json_schema, connection=connection, table_id="",
-                            interval=DISCOVERED_STREAMS_INTERVAL_SIZE)
-
-
-def load_streams_from_database(connection: PyMonetDBConnection, current_streams: List[str], tables,
-                               columns):
-    # FLUSHING_STREAMS = {1: 'TupleBasedStream', 2: 'TimeBasedStream', 3: 'AutoFlushedStream'}
-    # for tables: [0] -> id, [1] -> schema, [2] -> name, [3] -> base, [4] -> interval, [5] -> unit
-    # for columns: [0] -> id, [1] -> table_id, [2] -> name, [3] -> type, [4] -> type_digits, [5] -> type_scale,
-    # [6] -> is_null
-
-    new_streams = {}
-    found_streams = []
-    errors = []
-
-    grouped_columns = defaultdict(list)  # group the columns to the respective tables
-    for entry in columns:
-        grouped_columns[entry[1]].append(entry)
-
-    for entry in tables:
-        next_concatenated_name = get_context_entry_name(entry[1], entry[2])
-        retrieved_columns = grouped_columns[entry[0]]
-
-        if next_concatenated_name not in current_streams:
-            built_columns = OrderedDict()  # dictionary of name -> data_types
-            has_timestamp = False
-            has_errors = False
-
-            for column in retrieved_columns:
-                kwargs_dic = {'name': column[2], 'nullable': column[6]}
-                if TIMESTAMP_COLUMN_NAME == kwargs_dic['name']:
-                    has_timestamp = True
-                    kwargs_dic['nullable'] = True
-                next_switch = column[3]
-                kwargs_dic['type'] = next_switch
-                if next_switch in BOUNDED_TEXT_INPUTS:
-                    kwargs_dic['limit'] = column[4]
-                elif next_switch in INTERVAL_TYPES_INTERNAL:
-                    kwargs_dic['type'] = INTERVALS_DICTIONARY.get(column[4])
-                elif next_switch == TIME_WITH_TIMEZONE_TYPE_INTERNAL:
-                    kwargs_dic['type'] = TIME_WITH_TIMEZONE_TYPE_EXTERNAL
-                elif next_switch == TIMESTAMP_WITH_TIMEZONE_TYPE_INTERNAL:
-                    kwargs_dic['type'] = TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL
-
-                valid_type = False
-                for variable in JSON_SWITCHER:  # allocate the proper type wrapper
-                    if kwargs_dic['type'] in variable['types']:
-                        built_columns[kwargs_dic['name']] = variable['class'](**kwargs_dic)
-                        valid_type = True
-                        break
-                if not valid_type:
-                    errors.append("The type %s in stream %s is not covered by the guardian!" %
-                                  (kwargs_dic['type'], next_concatenated_name))
-                    has_errors = True
-                    break
-
-            if has_errors:
-                continue
-            elif has_timestamp:  # IMPORTANT -> Ignoring streams with no timestamps!!
-                properties = OrderedDict()
-                req_fields = []
-
-                for key, value in built_columns.items():
-                    value.add_json_schema_entry(properties)  # append new properties entry
-                    if not value.is_nullable():  # check if it's required
-                        req_fields.append(key)
-
-                json_schema = Draft4Validator({
-                    "title": "JSON schema to validate _inserts in stream " + entry[1] + "." + entry[2],
-                    "description": "Validate properties", "$schema": "http://json-schema.org/draft-04/schema#",
-                    "id": "http://monetdb.com/schemas/" + entry[1] + "." + entry[2] + ".json", "type": "array",
-                    "minItems": 1, "items": {"type": "object", "properties": properties, "required": req_fields,
-                                             "additionalProperties": False}
-                }, format_checker=FormatChecker())
-
-                if entry[3] == TUPLE_BASED_STREAM:
-                    new_stream = TupleBasedStream(schema_name=entry[1], stream_name=entry[2], columns=built_columns,
-                                                  json_validation_schema=json_schema, table_id=str(entry[0]),
-                                                  interval=int(entry[4]), connection=connection)
-                elif entry[3] == TIME_BASED_STREAM:
-                    new_stream = TimeBasedStream(schema_name=entry[1], stream_name=entry[2], columns=built_columns,
-                                                 json_validation_schema=json_schema, table_id=str(entry[0]),
-                                                 interval=int(entry[4]), time_unit=entry[5], connection=connection)
-                elif entry[3] == AUTO_BASED_STREAM:
-                    new_stream = AutoFlushedStream(schema_name=entry[1], stream_name=entry[2], columns=built_columns,
-                                                   json_validation_schema=json_schema, table_id=str(entry[0]),
-                                                   connection=connection)
-                else:
-                    errors.append("The stream's %s flushing is neither auto, tuple or time based?" %
-                                  next_concatenated_name)
-                    continue
-                new_streams[next_concatenated_name] = new_stream
-                found_streams.append(next_concatenated_name)
+    validated_columns.append(_create_stream_sql(TIMESTAMP_COLUMN_NAME, TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL,
+                                                True, None))
 
     if len(errors) > 0:
-        raise StreamException({'type': DATABASE_SYNCHRONIZATION, 'message': errors})
+        raise StreamException({'type': INFLUXDB_LINE_INSERT_VIOLATION, 'message': errors.__str__()})
 
-    removed_streams = list(filter(lambda x: x not in found_streams, current_streams))
-    return new_streams, removed_streams
+    (schema, stream) = metric.split('.')
+
+    get_mapi_connection().create_stream(schema, stream, ','.join(validated_columns))

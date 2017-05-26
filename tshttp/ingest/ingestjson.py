@@ -1,6 +1,4 @@
-from collections import OrderedDict
-
-from ingest.streams.context import get_streams_context
+from ingest.monetdb.mapiconnection import get_mapi_connection
 from ingest.streams.streamexception import StreamException
 from ingest.tsjson.jsonparser import json_create_stream, json_delete_stream, add_json_lines
 from tshttp.tsjsonhandler import TSBaseJSONHandler
@@ -10,13 +8,12 @@ class StreamInfo(TSBaseJSONHandler):
     """RESTful API for stream's input"""
 
     def get(self, schema_name, stream_name):  # check a single stream data
-        try:  # check if stream exists, if not return 404
-            stream = get_streams_context().get_existing_stream(schema_name, stream_name)
+        try:
+            self.write(get_mapi_connection().get_single_database_stream(schema_name, stream_name))
         except StreamException as ex:
             self.write_error(404, **{'message': ex.__str__()})
             return
 
-        self.write(OrderedDict(stream.get_data_dictionary()))
         self.set_status(200)
 
 
@@ -35,7 +32,12 @@ class StreamsHandling(TSBaseJSONHandler):
     """Admin class for creating/deleting streams"""
 
     def get(self):  # get all streams data
-        self.write(get_streams_context().get_streams_data())
+        try:
+            self.write(get_mapi_connection().get_database_streams())
+        except StreamException as ex:
+            self.write_error(404, **{'message': ex.__str__()})
+            return
+
         self.set_status(200)
 
     async def post(self):
