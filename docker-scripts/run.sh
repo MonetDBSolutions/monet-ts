@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-./docker-scripts/wait-for-it.sh db:50000 -s -- echo "MonetDB is up"
+./docker-scripts/wait-for-it.sh monetdb:50000 -s -- echo "MonetDB is up"
 
 EXIT_CODE=$?
 
