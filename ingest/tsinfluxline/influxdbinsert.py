@@ -1,10 +1,9 @@
 import datetime
-import random
 
 from ingest.monetdb.mapiconnection import get_mapi_connection
 from ingest.monetdb.naming import DATABASE_SCHEMA, get_default_timestamp_value, INFLUXDB_TEXT_TYPE, \
     INFLUXDB_BOOL_TYPE, INFLUXDB_INTEGER_TYPE, INFLUXDB_FLOAT_TYPE
-from ingest.streams.streamcreator import create_stream_from_influxdb
+from ingest.streams.streammanager import create_stream_from_influxdb
 
 CHUNK_SIZE = 100000
 
@@ -18,11 +17,12 @@ def flush(discovery, found_metrics, values_to_insert):
 
     for metric, values in values_to_insert.items():
         # "COPY 2 RECORDS INTO test FROM STDIN;\n44444444|AL|1495544891\n55555555|JAFFRI"
-        get_mapi_connection().insert_points(metric, len(values), '\n'.join(values))
+        get_mapi_connection().insert_points_via_csv(metric, len(values), '\n'.join(values))
 
 
+# WARNING this has a lot of security holes!!
 # sys.testing,location=us a=12i,b="hello" 1493109338000
-def insert_influxdb_values(lines: str, discovery: bool=False) -> None:
+def insert_influxdb_values_savage(lines: str, discovery: bool=False) -> None:
     time_to_input = get_default_timestamp_value()  # if the timestamp is missing
     values_to_insert = {}
     found_metrics = {}
@@ -77,7 +77,6 @@ def insert_influxdb_values(lines: str, discovery: bool=False) -> None:
             while lines[i] != '=':
                 i += 1
             if new_metric and discovery:
-                # random.choice('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')
                 next_column_name = lines[(j+1):i]
 
             i += 1

@@ -1,55 +1,55 @@
-from ingest.monetdb.mapiconnection import get_mapi_connection
-from ingest.streams.streamexception import StreamException
-from ingest.tsjson.jsonparser import json_create_stream, json_delete_stream, add_json_lines
-from tshttp.tsjsonhandler import TSBaseJSONHandler
+from collections import OrderedDict
+
+from ingest.streams.guardianexception import GuardianException
+from ingest.tsjson.jsonparser import json_create_stream, json_delete_stream, add_json_lines, json_get_single_stream, \
+    json_get_all_streams
+from tshttp.tshandlers import TSJSONHandler
 
 
-class StreamInfo(TSBaseJSONHandler):
+class StreamInfo(TSJSONHandler):
     """RESTful API for stream's input"""
 
-    def get(self, schema_name, stream_name):  # check a single stream data
+    async def get(self, schema_name, stream_name):  # check a single stream data
         try:
-            self.write(get_mapi_connection().get_single_database_stream(schema_name, stream_name))
-        except StreamException as ex:
-            self.write_error(404, **{'message': ex.__str__()})
-            return
+            result = await json_get_single_stream(schema_name, stream_name)
+            self.write(result)
+            self.set_status(200)
+        except GuardianException as ex:
+            self.write_guardian_exception(ex)
 
-        self.set_status(200)
 
-
-class JSONInput(TSBaseJSONHandler):
+class JSONInput(TSJSONHandler):
     """Add tuples to streams"""
 
     async def post(self):  # add data to a stream
-        errors = await add_json_lines(self.read_body())
-        if len(errors) > 0:
-            self.write_error(400, **{'messages': errors})
-        else:
-            self.set_status(201)
-
-
-class StreamsHandling(TSBaseJSONHandler):
-    """Admin class for creating/deleting streams"""
-
-    def get(self):  # get all streams data
         try:
-            self.write(get_mapi_connection().get_database_streams())
-        except StreamException as ex:
-            self.write_error(404, **{'message': ex.__str__()})
-            return
+            await add_json_lines(self.read_body())
+            self.set_status(201)
+        except GuardianException as ex:
+            self.write_guardian_exception(ex)
 
-        self.set_status(200)
+
+class StreamsHandling(TSJSONHandler):
+    """Create, delete and consult streams. Just pure CRUD"""
+
+    async def get(self):  # get all streams data
+        try:
+            result = await json_get_all_streams()
+            self.write(OrderedDict([('count', len(result)), ('listing', result)]))
+            self.set_status(200)
+        except GuardianException as ex:
+            self.write_guardian_exception(ex)
 
     async def post(self):
-        error = await json_create_stream(self.read_body())
-        if error is not None:
-            self.write_error(400, **{'message': error})
-        else:
+        try:
+            await json_create_stream(self.read_body())
             self.set_status(201)
+        except GuardianException as ex:
+            self.write_guardian_exception(ex)
 
     async def delete(self):
-        error = await json_delete_stream(self.read_body())
-        if error is not None:
-            self.write_error(400, **{'message': error})
-        else:
+        try:
+            await json_delete_stream(self.read_body())
             self.set_status(204)
+        except GuardianException as ex:
+            self.write_guardian_exception(ex)

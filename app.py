@@ -5,7 +5,7 @@ import getpass
 import socket
 import sys
 
-from ingest.monetdb.mapiconnection import init_mapi_connection
+from ingest.streams.streamcache import init_streams_context
 from ingest.monetdb.naming import DATABASE_NAME
 from settings.settings import DEPLOYMENT_STAGE, PRODUCTION
 from settings.ingestservers import init_servers
@@ -54,5 +54,5 @@ if __name__ == "__main__":
     else:
         con_password = getpass.getpass(prompt="Insert password for user " + args['user'] + ":")
 
-    init_mapi_connection(args['dhost'], args['dport'], args['user'], con_password, args['database'])
+    init_streams_context(args['dhost'], args['dport'], args['user'], con_password, args['database'])
     init_servers(args['port'], 1833)
