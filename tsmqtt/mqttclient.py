@@ -1,6 +1,7 @@
 from hbmqtt.client import MQTTClient, ClientException
 from hbmqtt.mqtt.constants import QOS_2
 
+from ingest.streams.guardianexception import GuardianException, MQTT_PROTOCOL_VIOLATION
 from ingest.tsinfluxline.influxdblineparser import add_influxdb_lines, discovery_influxdb_lines
 from ingest.tsjson.jsonparser import add_json_lines
 
@@ -24,21 +25,23 @@ async def mqttclient_coro():
             topic_name = packet.variable_header.topic_name
             decoded_packet_data = packet.payload.data.decode('utf-8')
 
-            if topic_name == INFLUXDB_TOPIC:
-                errors = await add_influxdb_lines(decoded_packet_data)
-            elif topic_name == DISCOVERY_TOPIC:
-                errors = await discovery_influxdb_lines(decoded_packet_data)
-            elif topic_name == JSON_TOPIC:
-                errors = await add_json_lines(decoded_packet_data)
-            else:
-                errors = ['Unknown topic %s!' % topic_name]
+            try:
+                if topic_name == INFLUXDB_TOPIC:
+                    await add_influxdb_lines(decoded_packet_data)
+                elif topic_name == DISCOVERY_TOPIC:
+                    await discovery_influxdb_lines(decoded_packet_data)
+                elif topic_name == JSON_TOPIC:
+                    await add_json_lines(decoded_packet_data)
+                else:
+                    raise GuardianException(where=MQTT_PROTOCOL_VIOLATION, message='Unknown topic %s!' % topic_name)
 
-            if len(errors) > 0:
-                printing = '[' + ','.join(errors) + ']'
-                await client.publish(ANSWER_TOPIC, printing.encode('utf-8'), qos=QOS_2)
-            else:
                 await client.publish(ANSWER_TOPIC, 'k'.encode('utf-8'), qos=QOS_2)
-
+            except GuardianException as ex:
+                if isinstance(ex.message, (list, tuple)):
+                    printing = '{"messages":["' + '","'.join(ex.message) + '"]}'
+                else:
+                    printing = '{"message":"' + ex.message + '"}'
+                await client.publish(ANSWER_TOPIC, printing.encode('utf-8'), qos=QOS_2)
     except ClientException as ex:
         print("An error occurred in the Guardian MQTT client: %s", ex.__str__())
         await client.unsubscribe(SUBSCRIPTION_TOPICS)

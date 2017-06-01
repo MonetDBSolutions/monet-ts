@@ -1,14 +1,16 @@
 import logging
 import pymonetdb
 
-from tshttp.tsjsonhandler import TSBaseJSONHandler
+from tshttp.tshandlers import TSJSONHandler
 
 logger = logging.getLogger('boilerplate.' + __name__)
 
 
-class QueryHandler(TSBaseJSONHandler):
+
+class QueryHandler(TSJSONHandler):
     def initialize(self, dbConnection):
         self.dbConnection = dbConnection
+
     def prepare(self):
         print("[QueryHandler] -- received request")
         self.dbConnection.open()

@@ -1,9 +1,5 @@
 from jsonschema import Draft4Validator, FormatChecker
 
-TIMED_FLUSH_IDENTIFIER = "time"
-TUPLE_FLUSH_IDENTIFIER = "tuple"
-AUTO_FLUSH_IDENTIFIER = "auto"
-
 TEXT_INPUT = "clob"
 UNBOUNDED_TEXT_INPUTS = [TEXT_INPUT, "text", "string"]
 BOUNDED_TEXT_INPUTS = ["char", "varchar", "character"]
@@ -29,11 +25,11 @@ DATE_INPUTS = ["date"]
 
 TIME_WITH_TIMEZONE_TYPE_INTERNAL = "timetz"
 TIME_WITH_TIMEZONE_TYPE_EXTERNAL = "time with time zone"
-TIME_INPUTS = ["time", TIME_WITH_TIMEZONE_TYPE_INTERNAL, TIME_WITH_TIMEZONE_TYPE_EXTERNAL]
+TIME_INPUTS = ["time", TIME_WITH_TIMEZONE_TYPE_EXTERNAL]
 
 TIMESTAMP_WITH_TIMEZONE_TYPE_INTERNAL = "timestamptz"
 TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL = "timestamp with time zone"
-TIMESTAMP_INPUTS = ["timestamp", TIMESTAMP_WITH_TIMEZONE_TYPE_INTERNAL, TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL]
+TIMESTAMP_INPUTS = ["timestamp", TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL]
 
 CREATE_STREAMS_SCHEMA = Draft4Validator({
     "title": "JSON schema to create a stream",
@@ -43,35 +39,9 @@ CREATE_STREAMS_SCHEMA = Draft4Validator({
     "properties": {
         "schema": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
         "stream": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
-        "flushing": {
-            "type": "object",
-            "oneOf": [{
-                "properties": {
-                    "base": {"type": "string", "enum": [TIMED_FLUSH_IDENTIFIER]},
-                    "interval": {"type": "integer", "minimum": 1},
-                    "unit": {"type": "string", "enum": ["s", "m", "h"]}
-                },
-                "required": ["base", "interval", "unit"],
-                "additionalProperties": False
-            }, {
-                "properties": {
-                    "base": {"type": "string", "enum": [TUPLE_FLUSH_IDENTIFIER]},
-                    "interval": {"type": "integer", "minimum": 1}
-                },
-                "required": ["base", "interval"],
-                "additionalProperties": False
-            }, {
-                "properties": {
-                    "base": {"type": "string", "enum": [AUTO_FLUSH_IDENTIFIER]},
-                },
-                "required": ["base"],
-                "additionalProperties": False
-            }]
-        },
         "columns": {
             "type": "array",
             "minItems": 1,
-            "additionalItems": False,
             "items": {
                 "type": "object",
                 "anyOf": [{
@@ -80,8 +50,7 @@ CREATE_STREAMS_SCHEMA = Draft4Validator({
                         "type": {"type": "string", "enum": UNBOUNDED_TEXT_INPUTS},
                         "nullable": {"type": "boolean", "default": True}
                     },
-                    "required": ["name", "type"],
-                    "additionalProperties": False
+                    "required": ["name", "type"]
                 }, {
                     "properties": {
                         "name": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
@@ -89,70 +58,59 @@ CREATE_STREAMS_SCHEMA = Draft4Validator({
                         "nullable": {"type": "boolean", "default": True},
                         "limit": {"type": "integer", "minimum": 1}
                     },
-                    "required": ["name", "type", "limit"],
-                    "additionalProperties": False
+                    "required": ["name", "type", "limit"]
                 }, {
                     "properties": {
                         "name": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
                         "type": {"type": "string", "enum": BOOLEAN_INPUTS},
                         "nullable": {"type": "boolean", "default": True}
                     },
-                    "required": ["name", "type"],
-                    "additionalProperties": False
+                    "required": ["name", "type"]
                 }, {
                     "properties": {
                         "name": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
                         "type": {"type": "string", "enum": INTEGER_INPUTS},
                         "nullable": {"type": "boolean", "default": True}
                     },
-                    "required": ["name", "type"],
-                    "additionalProperties": False
+                    "required": ["name", "type"]
                 }, {
                     "properties": {
                         "name": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
                         "type": {"type": "string", "enum": FLOATING_POINT_PRECISION_INPUTS},
                         "nullable": {"type": "boolean", "default": True}
                     },
-                    "required": ["name", "type"],
-                    "additionalProperties": False
+                    "required": ["name", "type"]
                 }, {
                     "properties": {
                         "name": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
                         "type": {"type": "string", "enum": DATE_INPUTS},
                         "nullable": {"type": "boolean", "default": True}
                     },
-                    "required": ["name", "type"],
-                    "additionalProperties": False
+                    "required": ["name", "type"]
                 }, {
                     "properties": {
                         "name": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
                         "type": {"type": "string", "enum": TIME_INPUTS},
                         "nullable": {"type": "boolean", "default": True}
                     },
-                    "required": ["name", "type"],
-                    "additionalProperties": False
+                    "required": ["name", "type"]
                 }, {
                     "properties": {
                         "name": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
                         "type": {"type": "string", "enum": TIMESTAMP_INPUTS},
                         "nullable": {"type": "boolean", "default": True}
                     },
-                    "required": ["name", "type"],
-                    "additionalProperties": False
+                    "required": ["name", "type"]
                 }]
             }
         },
         "tags": {
             "type": "array",
             "minItems": 1,
-            "uniqueItems": True,
-            "items": {
-                "type": "string"
-            }
+            "items": {"type": "string"}
         }
     },
-    "required": ["schema", "stream", "flushing", "columns"],
-    "additionalProperties": False
+    "required": ["schema", "stream", "columns"]
 }, format_checker=FormatChecker())
 
 DELETE_STREAMS_SCHEMA = Draft4Validator({
@@ -164,8 +122,7 @@ DELETE_STREAMS_SCHEMA = Draft4Validator({
         "schema": {"type": "string", "pattern": "[a-zA-Z0-9]+"},
         "stream": {"type": "string", "pattern": "[a-zA-Z0-9]+"}
     },
-    "required": ["schema", "stream"],
-    "additionalProperties": False
+    "required": ["schema", "stream"]
 }, format_checker=FormatChecker())
 
 INSERT_DATA_SCHEMA = Draft4Validator({
@@ -182,7 +139,6 @@ INSERT_DATA_SCHEMA = Draft4Validator({
             "values": {
                 "type": "array",
                 "minItems": 1,
-                "uniqueItems": False,
                 "items": {"type": "object"}
             }
         },
