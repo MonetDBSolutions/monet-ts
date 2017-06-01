@@ -7,7 +7,8 @@ import sys
 from termcolor import colored
 from ingest.streams.streamexception import StreamException
 
-from ingest.streams.context import init_streams_context
+from ingest.streams.streamcache import init_streams_context
+from ingest.monetdb.naming import DATABASE_NAME
 from settings.settings import DEPLOYMENT_STAGE, PRODUCTION
 from settings.ingestservers import init_servers
 
@@ -36,8 +37,8 @@ if __name__ == "__main__":
                         help='MonetDB database host (default: 127.0.0.1)', metavar='HOST')
     parser.add_argument('-dp', '--dport', type=check_positive_int, nargs='?', default=50000,
                         help='Database listening port (default: 50000)', metavar='PORT')
-    parser.add_argument('-d', '--database', nargs='?', default='timeseries', help='Database name (default: timeseries)')
-    parser.add_argument('-u', '--user', nargs='?', default='monetdb', help='Database user (default: monetdb)')
+    parser.add_argument('-d', '--database', nargs='?', default=DATABASE_NAME, help='Database name (default: %(default))')
+    parser.add_argument('-u', '--user', nargs='?', default='monetdb', help='Database user (default: %(default))')
     parser.add_argument('-?', '--help', action='store_true', help='Display this help')
 
     try:
