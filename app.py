@@ -5,7 +5,7 @@ import getpass
 import socket
 import sys
 from termcolor import colored
-from ingest.streams.streamexception import StreamException
+from ingest.streams.guardianexception import GuardianException
 
 from ingest.streams.streamcache import init_streams_context
 from ingest.monetdb.naming import DATABASE_NAME
@@ -59,6 +59,6 @@ if __name__ == "__main__":
     try:
         init_streams_context(args['dhost'], args['dport'], args['user'], con_password, args['database'])
         print(colored('Init stream context SUCCESS ...', 'green'))
-    except StreamException as ex:
+    except GuardianException as ex:
         print(colored('Fail to initialize stream context!', 'red'))
     init_servers(args['port'], 1833)
