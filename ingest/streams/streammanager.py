@@ -77,7 +77,7 @@ def create_stream_from_influxdb(metric: str, column: Dict[str, Dict[str, Any]]) 
         if value['isTag']:
             validated_columns.append({'name': key, 'type': TEXT_INPUT, 'nullable': False})
         else:
-            next_type = INFLUXDB_SWITCHER.get(value['isTag'], TEXT_INPUT)
+            next_type = INFLUXDB_SWITCHER.get(value['type'], TEXT_INPUT)
             validated_columns.append({'name': key, 'type': next_type, 'nullable': True})
 
     validated_columns.append({'name': TIMESTAMP_COLUMN_NAME, 'type': TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL,
