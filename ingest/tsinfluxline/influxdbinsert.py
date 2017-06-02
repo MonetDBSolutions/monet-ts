@@ -72,7 +72,7 @@ def insert_influxdb_values_savage(lines: str, discovery: bool=False) -> None:
 
         i += 1
         # parse the columns
-        while lines[i] not in (' ', '\n'):
+        while i < length_lines and lines[i] not in (' ', '\n'):
             j = i
             while lines[i] != '=':
                 i += 1
@@ -81,7 +81,7 @@ def insert_influxdb_values_savage(lines: str, discovery: bool=False) -> None:
 
             i += 1
             j = i
-            while lines[i] not in (',', ' '):
+            while i < length_lines and lines[i] not in (',', ' '):
                 i += 1
             next_insert = lines[j:i]
 
@@ -107,7 +107,7 @@ def insert_influxdb_values_savage(lines: str, discovery: bool=False) -> None:
                     found_metrics[metric_name]['columns'][next_column_name] = {'type': INFLUXDB_FLOAT_TYPE, 'isTag': False}
 
         # parse the timestamp
-        if lines[i] == ' ':
+        if i < length_lines and lines[i] == ' ':
             i += 1
             j = i
             while i < length_lines and lines[i].isdigit():
@@ -120,7 +120,7 @@ def insert_influxdb_values_savage(lines: str, discovery: bool=False) -> None:
         inserts.append(parsed_timestamp)
         values_to_insert[metric_name].append('|'.join(inserts))
 
-        if i < length_lines and lines[i] == '\n':
+        while i < length_lines and lines[i] == '\n':
             i += 1
 
         line_number += 1
