@@ -34,13 +34,22 @@ class PyMonetDBConnection(object):
 
     def create_stream(self, schema: str, stream: str, columns: List[Dict[Any, Any]]) -> None:
         validated_columns = []
+        primary_keys = []
+
         for entry in columns:
             validated_columns.append(_create_stream_sql(entry['name'], entry['type'], entry['nullable'],
                                                         entry.get('limit', None)))
+            if entry['isTag'] is True:
+                primary_keys.append(entry['name'])
+
+        column_sql = ','.join(validated_columns)
+        if len(primary_keys) > 0:
+            column_sql += ', PRIMARY KEY (' + ','.join(primary_keys) + ')'
+
         try:
             self._cursor.execute("CREATE SCHEMA IF NOT EXISTS %s" % my_monet_escape(schema))
             self._cursor.execute("CREATE STREAM TABLE %s.%s (%s)" % (my_monet_escape(schema), my_monet_escape(stream),
-                                                                     ','.join(validated_columns)))
+                                                                     column_sql))
             self._connection.commit()
         except BaseException as ex:
             self._connection.rollback()

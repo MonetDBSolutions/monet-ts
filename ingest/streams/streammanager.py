@@ -31,7 +31,8 @@ def create_json_stream(schema: Dict[Any, Any]) -> None:
             errors.append("The column name %s is reserved!" % TIMESTAMP_COLUMN_NAME)
             continue
 
-        found_columns.extend(next_name)
+        found_columns.append(next_name)
+        column['isTag'] = False
 
     if 'tags' in schema:
         for tag in schema['tags']:
@@ -39,14 +40,14 @@ def create_json_stream(schema: Dict[Any, Any]) -> None:
                 errors.append("The column %s is duplicated?" % tag)
                 continue
 
-            found_columns.extend(tag)
-            schema['columns'].append({'name': tag, 'type': TEXT_INPUT, 'nullable': False})
+            found_columns.append(tag)
+            schema['columns'].append({'name': tag, 'type': TEXT_INPUT, 'nullable': False, 'isTag': True})
 
     if len(errors) > 0:
         raise GuardianException(where=JSON_SCHEMA_CREATE_VIOLATION, message=errors)
 
     schema['columns'].append({'name': TIMESTAMP_COLUMN_NAME, 'type': TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL,
-                              'nullable': True})
+                              'nullable': True, 'isTag': False})
     get_stream_cache().create_stream(schema['schema'], schema['stream'], schema['columns'])
 
 
@@ -75,13 +76,13 @@ def create_stream_from_influxdb(metric: str, column: Dict[str, Dict[str, Any]]) 
         found_columns.append(key)
 
         if value['isTag']:
-            validated_columns.append({'name': key, 'type': TEXT_INPUT, 'nullable': False})
+            validated_columns.append({'name': key, 'type': TEXT_INPUT, 'nullable': False, 'isTag': True})
         else:
             next_type = INFLUXDB_SWITCHER.get(value['type'], TEXT_INPUT)
-            validated_columns.append({'name': key, 'type': next_type, 'nullable': True})
+            validated_columns.append({'name': key, 'type': next_type, 'nullable': True, 'isTag': False})
 
     validated_columns.append({'name': TIMESTAMP_COLUMN_NAME, 'type': TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL,
-                              'nullable': True})
+                              'nullable': True, 'isTag': False})
     if len(errors) > 0:
         raise GuardianException(where=INFLUXDB_LINE_INSERT_VIOLATION, message=errors)
 
