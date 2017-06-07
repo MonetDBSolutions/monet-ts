@@ -14,6 +14,16 @@ CREATE TABLE timetrails.metrics (
      description string --short explanation
 );
 
+--Return the names of all measurments in timetrails schema
+CREATE FUNCTION timetrails.measurments()
+RETURNS TABLE (measurment string)
+BEGIN
+    RETURN 
+        SELECT name 
+        FROM sys.tables 
+        WHERE schema_id=(SELECT id as id FROM sys.schemas WHERE name='timetrails') AND name<>'metrics';
+END;
+
 --Return the names of all known metric relations
 CREATE FUNCTION timetrails.metrics()
 RETURNS TABLE (metric string)
@@ -27,7 +37,7 @@ RETURNS TABLE (colname string)
 BEGIN 
    RETURN SELECT o.name AS colname 
        FROM sys.objects o, sys.tables t, sys.keys k 
-       WHERE o.id = k.id AND k.table_id = t.id AND t.name = metric ORDER BY o.nr;
+       WHERE o.id = k.id AND k.table_id = t.id AND t.name = metric AND o.name<>'ticks' ORDER BY o.nr;
 END;
 
 --Return the measure names for a metric relation
@@ -72,9 +82,3 @@ BEGIN
    RETURN SELECT m.description FROM timetrails.metrics m WHERE m.name = metric;
 END;
 
---Extracts epoch time in ms from given timestamp
--- CREATE FUNCTION timetrails.epoch(ts TIMESTAMP)
--- RETURNS BIGINT
--- BEGIN
---     RETURN SELECT CAST((ts - TIMESTAMP '1970/01/01 00:00:00.000') as BIGINT);
--- END;
