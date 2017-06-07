@@ -22,7 +22,7 @@ def number_converter(value) -> str:
 
 
 def timestamp_converter(value) -> str:
-    if type(value) != str:
+    if type(value) == int:
         value = datetime.datetime.fromtimestamp(value).isoformat()
     return "'" + value + "'"
 

@@ -83,9 +83,9 @@ class PyMonetDBConnection(object):
 
     def get_single_database_stream(self, schema: str, stream: str) -> Dict[Any, Any]:
         """The sql injection should be prevented from the upper layer, but I am doing here as well"""
-        try:
+        try:  # TODO type='4'
             sqlt = ''.join(["""SELECT tables."id", schemas."name", tables."name" FROM""",
-                            """(SELECT "id", "name", "schema_id" FROM sys.tables WHERE type='4' AND tables."name"='""",
+                            """(SELECT "id", "name", "schema_id" FROM sys.tables WHERE tables."name"='""",
                             my_monet_escape(stream),
                             """') AS tables INNER JOIN (SELECT "id", "name" FROM sys.schemas WHERE schemas."name"='""",
                             my_monet_escape(schema),
@@ -128,9 +128,9 @@ class PyMonetDBConnection(object):
     def get_database_streams(self) -> List[Dict[Any, Any]]:
         results = []
 
-        try:
+        try:  # TODO add STREAM table back!  WHERE type=4
             tables_sql_string = """SELECT tables."id", schemas."name", tables."name" FROM
-                (SELECT "id", "name", "schema_id" FROM sys.tables WHERE type=4) AS tables INNER JOIN (SELECT "id",
+                (SELECT "id", "name", "schema_id" FROM sys.tables) AS tables INNER JOIN (SELECT "id",
                 "name" FROM sys.schemas) AS schemas ON (tables."schema_id"=schemas."id") ORDER BY tables."id" """\
                 .replace('\n', ' ')
             self._cursor.execute(tables_sql_string)
@@ -139,7 +139,7 @@ class PyMonetDBConnection(object):
             if len(tables) > 0:
                 columns_sql_string = """SELECT columns."table_id", columns."name", columns."type", columns."null",
                     columns."type_digits" FROM (SELECT "id", "table_id", "name", "type", "null", "number", "type_digits"
-                    FROM sys.columns) AS columns INNER JOIN (SELECT "id" FROM sys.tables WHERE type=4) AS tables ON
+                    FROM sys.columns) AS columns INNER JOIN (SELECT "id" FROM sys.tables) AS tables ON
                     (tables."id"=columns."table_id") ORDER BY columns."table_id", columns."number" """\
                     .replace('\n', ' ')
                 self._cursor.execute(columns_sql_string)

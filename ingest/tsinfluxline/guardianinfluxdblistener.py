@@ -143,7 +143,7 @@ class GuardianInfluxDBListener(influxdbListener):
 
         next_timestamp = ctx.INFLUXWORD()
         try:
-            self._current_values[TIMESTAMP_COLUMN_NAME] = int(next_timestamp.getText()[:-3])
+            self._current_values[TIMESTAMP_COLUMN_NAME] = int(next_timestamp.getText()[:-9])
         except:
             self._there_is_error = "The timestamp at line %d is not in the valid format!" % self._line_number
             return
