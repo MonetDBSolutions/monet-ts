@@ -2,7 +2,7 @@ from collections import defaultdict, OrderedDict
 from typing import Dict, Any, List
 from pymonetdb import connect
 
-from ingest.monetdb.naming import my_monet_escape
+from ingest.monetdb.naming import my_monet_escape, TIMESTAMP_COLUMN_NAME
 from ingest.streams.guardianexception import GuardianException, MAPI_CONNECTION_VIOLATION, STREAM_NOT_FOUND
 from ingest.tsjson.jsonschemas import TIME_WITH_TIMEZONE_TYPE_INTERNAL, TIME_WITH_TIMEZONE_TYPE_EXTERNAL, \
     TIMESTAMP_WITH_TIMEZONE_TYPE_INTERNAL, TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL, BOUNDED_TEXT_INPUTS
@@ -40,16 +40,16 @@ class PyMonetDBConnection(object):
             validated_columns.append(_create_stream_sql(entry['name'], entry['type'], entry['nullable'],
                                                         entry.get('limit', None)))
             if entry['isTag'] is True:
-                primary_keys.append(entry['name'])
+                primary_keys.append(my_monet_escape(entry['name']))
 
+        primary_keys.append(TIMESTAMP_COLUMN_NAME)
         column_sql = ','.join(validated_columns)
-        if len(primary_keys) > 0:
-            column_sql += ', PRIMARY KEY (' + ','.join(primary_keys) + ')'
+        column_sql += ', PRIMARY KEY (' + ','.join(primary_keys) + ')'
 
-        try:
+        try:  # TODO add STREAM table back!
             self._cursor.execute("CREATE SCHEMA IF NOT EXISTS %s" % my_monet_escape(schema))
-            self._cursor.execute("CREATE STREAM TABLE %s.%s (%s)" % (my_monet_escape(schema), my_monet_escape(stream),
-                                                                     column_sql))
+            self._cursor.execute("CREATE TABLE %s.%s (%s)" % (my_monet_escape(schema), my_monet_escape(stream),
+                                                              column_sql))
             self._connection.commit()
         except BaseException as ex:
             self._connection.rollback()

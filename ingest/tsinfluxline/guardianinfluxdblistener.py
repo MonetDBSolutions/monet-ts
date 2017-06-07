@@ -18,6 +18,7 @@ class GuardianInfluxDBListener(influxdbListener):
         self._current_schema = ''
         self._current_stream = ''
         self._current_values = {}
+        self._current_tags = []
         self._there_is_error = None
 
     def get_parsed_values(self) -> List[Dict[str, Any]]:
@@ -33,6 +34,7 @@ class GuardianInfluxDBListener(influxdbListener):
         self._current_schema = ''
         self._current_stream = ''
         self._current_values = {}
+        self._current_tags = []
         self._there_is_error = None
 
     def exitLine(self, ctx: influxdbParser.LineContext) -> None:
@@ -40,7 +42,7 @@ class GuardianInfluxDBListener(influxdbListener):
             metric_name = get_metric_name(self._current_schema, self._current_stream)
             if metric_name not in self._grouped_streams:
                 self._grouped_streams[metric_name] = {'schema': self._current_schema, 'stream': self._current_stream,
-                                                      'values': [self._current_values]}
+                                                      'values': [self._current_values], 'tags': self._current_tags}
             else:
                 self._grouped_streams[metric_name]['values'].append(self._current_values)
         else:
@@ -84,6 +86,7 @@ class GuardianInfluxDBListener(influxdbListener):
             self._there_is_error = "The tag %s is duplicated at line %d!" % (next_tkey, self._line_number)
             return
 
+        self._current_tags.append(next_tkey)
         self._current_values[next_tkey] = next_tvalue.getText()
 
     def enterVtype(self, ctx: influxdbParser.VtypeContext) -> None:

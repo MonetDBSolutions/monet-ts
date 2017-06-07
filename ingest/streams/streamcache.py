@@ -10,9 +10,10 @@ class GuardianStreamCache(object):
         self._cache = {}  # dictionary of metric_name -> column details
 
     def create_stream(self, schema_name: str, stream_name: str, columns: Any) -> None:
-        get_mapi_connection().create_stream(schema_name, stream_name, columns)
-        metric_name = get_metric_name(schema_name, stream_name)
-        self._cache[metric_name] = columns
+        if self.try_get_stream(schema_name, stream_name) is None:
+            get_mapi_connection().create_stream(schema_name, stream_name, columns)
+            metric_name = get_metric_name(schema_name, stream_name)
+            self._cache[metric_name] = columns
 
     def delete_stream(self, schema_name: str, stream_name: str) -> None:
         metric_name = get_metric_name(schema_name, stream_name)

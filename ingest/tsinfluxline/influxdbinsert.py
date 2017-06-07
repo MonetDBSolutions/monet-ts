@@ -4,7 +4,7 @@ from collections import OrderedDict
 from ingest.monetdb.mapiconnection import get_mapi_connection
 from ingest.monetdb.naming import DATABASE_SCHEMA, get_default_timestamp_value, INFLUXDB_TEXT_TYPE, \
     INFLUXDB_BOOL_TYPE, INFLUXDB_INTEGER_TYPE, INFLUXDB_FLOAT_TYPE
-from ingest.streams.streammanager import create_stream_from_influxdb
+from ingest.streams.streammanager import create_stream_from_influxdb_discovery_fast
 
 CHUNK_SIZE = 100000
 
@@ -15,7 +15,7 @@ def flush(discovery, found_metrics, values_to_insert):
             if not values['created']:
                 tuples_array = map(lambda x: (x['name'], {'type': x['type'], 'isTag': x['isTag']}), values['columns'])
                 values['columns'] = OrderedDict(tuples_array)
-                create_stream_from_influxdb(metric, values['columns'])
+                create_stream_from_influxdb_discovery_fast(metric, values['columns'])
                 values['created'] = True
 
     for metric, values in values_to_insert.items():
@@ -23,10 +23,9 @@ def flush(discovery, found_metrics, values_to_insert):
         get_mapi_connection().insert_points_via_csv(metric, len(values), '\n'.join(values))
 
 
-# WARNING this has a lot of security holes!!
+# WARNING this has a lot of holes!!
 # sys.testing,location=us a=12i,b="hello" 1493109338000
 def insert_influxdb_values_savage(lines: str, discovery: bool=False) -> None:
-    time_to_input = get_default_timestamp_value()  # if the timestamp is missing
     values_to_insert = {}
     found_metrics = {}
     i = 0
@@ -129,7 +128,7 @@ def insert_influxdb_values_savage(lines: str, discovery: bool=False) -> None:
             unix_timestamp = int(lines[j:i-9])
             parsed_timestamp = datetime.datetime.fromtimestamp(unix_timestamp).isoformat()
         else:
-            parsed_timestamp = time_to_input
+            parsed_timestamp = get_default_timestamp_value()
 
         inserts.append(parsed_timestamp)
         values_to_insert[metric_name].append('|'.join(inserts))

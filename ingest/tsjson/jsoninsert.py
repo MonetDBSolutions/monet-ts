@@ -61,7 +61,6 @@ for entry in TIMESTAMP_INPUTS:
 
 
 def insert_json_values(input_json: List[Dict[str, Any]]) -> None:
-    time_to_input = "'" + get_default_timestamp_value() + "'"  # if the timestamp is missing
     mapi_context = get_stream_cache()
     errors = []
     stream_entry_counter = 0
@@ -126,7 +125,7 @@ def insert_json_values(input_json: List[Dict[str, Any]]) -> None:
 
             # add the timestamp column if missing
             if next_inserts[-1] == 'NULL':
-                next_inserts[-1] = time_to_input
+                next_inserts[-1] = "'" + get_default_timestamp_value() + "'"
 
             next_batch.append("(" + ",".join(next_inserts) + ")")
 
