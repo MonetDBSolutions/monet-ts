@@ -24,29 +24,30 @@ def create_json_stream(schema: Dict[Any, Any]) -> None:
         next_name = column['name']
 
         if next_name in found_columns:
-            errors.append("The column %s is duplicated?" % next_name)
+            errors.append("The column '%s' is duplicated?" % next_name)
             continue
 
         if next_name == TIMESTAMP_COLUMN_NAME:
-            errors.append("The column name %s is reserved!" % TIMESTAMP_COLUMN_NAME)
+            errors.append("The column name '%s' is reserved!" % TIMESTAMP_COLUMN_NAME)
             continue
 
-        found_columns.extend(next_name)
+        found_columns.append(next_name)
+        column['isTag'] = False
 
     if 'tags' in schema:
         for tag in schema['tags']:
             if tag in found_columns:
-                errors.append("The column %s is duplicated?" % tag)
+                errors.append("The column '%s' is duplicated?" % tag)
                 continue
 
-            found_columns.extend(tag)
-            schema['columns'].append({'name': tag, 'type': TEXT_INPUT, 'nullable': False})
+            found_columns.append(tag)
+            schema['columns'].append({'name': tag, 'type': TEXT_INPUT, 'nullable': False, 'isTag': True})
 
     if len(errors) > 0:
         raise GuardianException(where=JSON_SCHEMA_CREATE_VIOLATION, message=errors)
 
     schema['columns'].append({'name': TIMESTAMP_COLUMN_NAME, 'type': TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL,
-                              'nullable': True})
+                              'nullable': True, 'isTag': False})
     get_stream_cache().create_stream(schema['schema'], schema['stream'], schema['columns'])
 
 
@@ -54,36 +55,59 @@ def delete_json_stream(schema: Dict[Any, Any]) -> None:
     get_stream_cache().delete_stream(schema['schema'], schema['stream'])
 
 
-INFLUXDB_SWITCHER = {INFLUXDB_BOOL_TYPE: BOOLEAN_INPUT, INFLUXDB_INTEGER_TYPE: BIGINTEGER_INPUT,
-                     INFLUXDB_FLOAT_TYPE: DOUBLE_PRECISION_INPUT, INFLUXDB_TEXT_TYPE: TEXT_INPUT}
+INFLUXDB_FAST_SWITCHER = {INFLUXDB_BOOL_TYPE: BOOLEAN_INPUT, INFLUXDB_INTEGER_TYPE: BIGINTEGER_INPUT,
+                          INFLUXDB_FLOAT_TYPE: DOUBLE_PRECISION_INPUT, INFLUXDB_TEXT_TYPE: TEXT_INPUT}
 
 
-def create_stream_from_influxdb(metric: str, column: Dict[str, Dict[str, Any]]) -> None:
+def create_stream_from_influxdb_discovery_fast(metric: str, column: Dict[str, Dict[str, Any]]) -> None:
     validated_columns = []
     found_columns = []
     errors = []
 
     for key, value in column.items():
         if key in found_columns:
-            errors.append("The column %s is duplicated?" % key)
+            errors.append("The column '%s' is duplicated?" % key)
             continue
 
         if key == TIMESTAMP_COLUMN_NAME:
-            errors.append("The column name %s is reserved!" % TIMESTAMP_COLUMN_NAME)
+            errors.append("The column name '%s' is reserved!" % TIMESTAMP_COLUMN_NAME)
             continue
 
         found_columns.append(key)
 
         if value['isTag']:
-            validated_columns.append({'name': key, 'type': TEXT_INPUT, 'nullable': False})
+            validated_columns.append({'name': key, 'type': TEXT_INPUT, 'nullable': False, 'isTag': True})
         else:
-            next_type = INFLUXDB_SWITCHER.get(value['type'], TEXT_INPUT)
-            validated_columns.append({'name': key, 'type': next_type, 'nullable': True})
+            next_type = INFLUXDB_FAST_SWITCHER.get(value['type'], TEXT_INPUT)
+            validated_columns.append({'name': key, 'type': next_type, 'nullable': True, 'isTag': False})
 
     validated_columns.append({'name': TIMESTAMP_COLUMN_NAME, 'type': TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL,
-                              'nullable': True})
+                              'nullable': True, 'isTag': False})
     if len(errors) > 0:
         raise GuardianException(where=INFLUXDB_LINE_INSERT_VIOLATION, message=errors)
 
     (schema, stream) = metric.split('.')
+    get_stream_cache().create_stream(schema, stream, validated_columns)
+
+
+INFLUXDB_SLOW_SWITCHER = {bool: BOOLEAN_INPUT, int: BIGINTEGER_INPUT, float: DOUBLE_PRECISION_INPUT, str: TEXT_INPUT}
+
+
+def create_stream_from_influxdb_discovery_slow(schema: str, stream: str, first_insert: Dict[str, Any],
+                                               tags: List[str]) -> None:
+    validated_columns = []
+
+    for key, value in first_insert.items():
+        if key == TIMESTAMP_COLUMN_NAME:  # the timestamp column is added at the end
+            continue
+
+        if key in tags:
+            validated_columns.append({'name': key, 'type': TEXT_INPUT, 'nullable': False, 'isTag': True})
+        else:
+            next_type = INFLUXDB_SLOW_SWITCHER.get(type(value), TEXT_INPUT)
+            validated_columns.append({'name': key, 'type': next_type, 'nullable': True, 'isTag': False})
+
+    validated_columns.append({'name': TIMESTAMP_COLUMN_NAME, 'type': TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL,
+                              'nullable': True, 'isTag': False})
+
     get_stream_cache().create_stream(schema, stream, validated_columns)

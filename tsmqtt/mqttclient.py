@@ -2,14 +2,16 @@ from hbmqtt.client import MQTTClient, ClientException
 from hbmqtt.mqtt.constants import QOS_2
 
 from ingest.streams.guardianexception import GuardianException, MQTT_PROTOCOL_VIOLATION
-from ingest.tsinfluxline.influxdblineparser import add_influxdb_lines, discovery_influxdb_lines
+from ingest.tsinfluxline.influxdblineparser import add_influxdb_lines, discovery_influxdb_lines_fast, \
+    discovery_influxdb_lines_slow
 from ingest.tsjson.jsonparser import add_json_lines
 
 JSON_TOPIC = '/json'
 INFLUXDB_TOPIC = '/influxdb'
 DISCOVERY_TOPIC = '/discovery'
+DISCOVERY_SLOW_TOPIC = '/discoveryslow'
 
-SUBSCRIPTION_TOPICS = [JSON_TOPIC, INFLUXDB_TOPIC, DISCOVERY_TOPIC]
+SUBSCRIPTION_TOPICS = [JSON_TOPIC, INFLUXDB_TOPIC, DISCOVERY_TOPIC, DISCOVERY_SLOW_TOPIC]
 QOS_VALUES = list(map(lambda x: (x, QOS_2), SUBSCRIPTION_TOPICS))
 
 ANSWER_TOPIC = '/answer'
@@ -29,7 +31,9 @@ async def mqttclient_coro():
                 if topic_name == INFLUXDB_TOPIC:
                     await add_influxdb_lines(decoded_packet_data)
                 elif topic_name == DISCOVERY_TOPIC:
-                    await discovery_influxdb_lines(decoded_packet_data)
+                    await discovery_influxdb_lines_fast(decoded_packet_data)
+                elif topic_name == DISCOVERY_SLOW_TOPIC:
+                    await discovery_influxdb_lines_slow(decoded_packet_data)
                 elif topic_name == JSON_TOPIC:
                     await add_json_lines(decoded_packet_data)
                 else:

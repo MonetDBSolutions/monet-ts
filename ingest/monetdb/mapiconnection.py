@@ -2,7 +2,7 @@ from collections import defaultdict, OrderedDict
 from typing import Dict, Any, List
 from pymonetdb import connect
 
-from ingest.monetdb.naming import my_monet_escape
+from ingest.monetdb.naming import my_monet_escape, TIMESTAMP_COLUMN_NAME
 from ingest.streams.guardianexception import GuardianException, MAPI_CONNECTION_VIOLATION, STREAM_NOT_FOUND
 from ingest.tsjson.jsonschemas import TIME_WITH_TIMEZONE_TYPE_INTERNAL, TIME_WITH_TIMEZONE_TYPE_EXTERNAL, \
     TIMESTAMP_WITH_TIMEZONE_TYPE_INTERNAL, TIMESTAMP_WITH_TIMEZONE_TYPE_EXTERNAL, BOUNDED_TEXT_INPUTS
@@ -46,13 +46,22 @@ class PyMonetDBConnection(object):
 
     def create_stream(self, schema: str, stream: str, columns: List[Dict[Any, Any]]) -> None:
         validated_columns = []
+        primary_keys = []
+
         for entry in columns:
             validated_columns.append(_create_stream_sql(entry['name'], entry['type'], entry['nullable'],
                                                         entry.get('limit', None)))
-        try:
+            if entry['isTag'] is True:
+                primary_keys.append(my_monet_escape(entry['name']))
+
+        primary_keys.append(TIMESTAMP_COLUMN_NAME)
+        column_sql = ','.join(validated_columns)
+        column_sql += ', PRIMARY KEY (' + ','.join(primary_keys) + ')'
+
+        try:  # TODO add STREAM table back!
             self._cursor.execute("CREATE SCHEMA IF NOT EXISTS %s" % my_monet_escape(schema))
-            self._cursor.execute("CREATE STREAM TABLE %s.%s (%s)" % (my_monet_escape(schema), my_monet_escape(stream),
-                                                                     ','.join(validated_columns)))
+            self._cursor.execute("CREATE TABLE %s.%s (%s)" % (my_monet_escape(schema), my_monet_escape(stream),
+                                                              column_sql))
             self._connection.commit()
         except BaseException as ex:
             self._connection.rollback()
@@ -86,9 +95,9 @@ class PyMonetDBConnection(object):
 
     def get_single_database_stream(self, schema: str, stream: str) -> Dict[Any, Any]:
         """The sql injection should be prevented from the upper layer, but I am doing here as well"""
-        try:
+        try:  # TODO type='4'
             sqlt = ''.join(["""SELECT tables."id", schemas."name", tables."name" FROM""",
-                            """(SELECT "id", "name", "schema_id" FROM sys.tables WHERE type='4' AND tables."name"='""",
+                            """(SELECT "id", "name", "schema_id" FROM sys.tables WHERE tables."name"='""",
                             my_monet_escape(stream),
                             """') AS tables INNER JOIN (SELECT "id", "name" FROM sys.schemas WHERE schemas."name"='""",
                             my_monet_escape(schema),
@@ -131,9 +140,9 @@ class PyMonetDBConnection(object):
     def get_database_streams(self) -> List[Dict[Any, Any]]:
         results = []
 
-        try:
+        try:  # TODO add STREAM table back!  WHERE type=4
             tables_sql_string = """SELECT tables."id", schemas."name", tables."name" FROM
-                (SELECT "id", "name", "schema_id" FROM sys.tables WHERE type=4) AS tables INNER JOIN (SELECT "id",
+                (SELECT "id", "name", "schema_id" FROM sys.tables) AS tables INNER JOIN (SELECT "id",
                 "name" FROM sys.schemas) AS schemas ON (tables."schema_id"=schemas."id") ORDER BY tables."id" """\
                 .replace('\n', ' ')
             self._cursor.execute(tables_sql_string)
@@ -142,7 +151,7 @@ class PyMonetDBConnection(object):
             if len(tables) > 0:
                 columns_sql_string = """SELECT columns."table_id", columns."name", columns."type", columns."null",
                     columns."type_digits" FROM (SELECT "id", "table_id", "name", "type", "null", "number", "type_digits"
-                    FROM sys.columns) AS columns INNER JOIN (SELECT "id" FROM sys.tables WHERE type=4) AS tables ON
+                    FROM sys.columns) AS columns INNER JOIN (SELECT "id" FROM sys.tables) AS tables ON
                     (tables."id"=columns."table_id") ORDER BY columns."table_id", columns."number" """\
                     .replace('\n', ' ')
                 self._cursor.execute(columns_sql_string)
