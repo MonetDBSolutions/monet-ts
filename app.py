@@ -11,7 +11,8 @@ from ingest.streams.streamcache import init_streams_context
 from ingest.monetdb.naming import DATABASE_NAME
 from settings.settings import DEPLOYMENT_STAGE, PRODUCTION
 from settings.ingestservers import init_servers
-
+from ingest.monetdb.mapiconnection import PyMonetDBConnection
+from tshttp import createApp
 
 def check_positive_int(value):
     ivalue = int(value)
@@ -61,4 +62,10 @@ if __name__ == "__main__":
         print(colored('Init stream context SUCCESS ...', 'green'))
     except GuardianException as ex:
         print(colored('Fail to initialize stream context!', 'red'))
-    init_servers(args['port'], 1833)
+        print(ex)
+    dbConnection = PyMonetDBConnection(args['dhost'], args['dport'], args['user'], con_password, args['database'])
+    app_options = {
+        'dbConnection': dbConnection
+    }
+    app = createApp(app_options)
+    init_servers(args['port'], 1833, app)

@@ -5,12 +5,14 @@ from tshttp.ingest.ingestinfluxdb import InfluxDBInput, InfluxDBDiscovery, Influ
 from tshttp.ingest.ingestjson import StreamsHandling, JSONInput, StreamInfo
 from tshttp.queries.query import QueryHandler
 
-guardian_application = Application([
-    (r"/query", QueryHandler),
-    (r"/context", StreamsHandling),
-    (r"/stream/([a-zA-Z0-9]+)/([a-zA-Z0-9]+)", StreamInfo),
-    (r"/json", JSONInput),
-    (r"/influxdb", InfluxDBInput),
-    (r"/discovery", InfluxDBDiscovery),
-    (r"/discoveryslow", InfluxDBDiscoverySlow)
-], settings)
+def createApp(options):
+    app = Application([
+        (r"/query", QueryHandler, options),
+        (r"/context", StreamsHandling),
+        (r"/stream/([a-zA-Z0-9]+)/([a-zA-Z0-9]+)", StreamInfo, options),
+        (r"/json", JSONInput),
+        (r"/influxdb", InfluxDBInput),
+        (r"/discovery", InfluxDBDiscovery),
+        (r"/discoveryslow", InfluxDBDiscoverySlow)
+    ], settings)
+    return app
