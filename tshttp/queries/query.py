@@ -1,5 +1,7 @@
 import logging
+import asyncio
 import pymonetdb
+from ingest.monetdb.naming import THREAD_POOL
 
 from tshttp.tshandlers import TSJSONHandler
 
@@ -12,11 +14,18 @@ class QueryHandler(TSJSONHandler):
 
     def prepare(self):
         print("[QueryHandler] -- received request")
+        user = self.get_query_argument('user')
+        password = self.get_query_argument('pass')
+        db = self.get_query_argument('db')
+        if user and password and db:
+            self.dbConnection.setCredentials(user, password, db)
         self.dbConnection.open()
-    def get(self):
+
+    async def get(self):
         self.setCORSHeaders()
         try:
-            results = self.db_fetch()
+            future = THREAD_POOL.submit(self.db_fetch)
+            results = await asyncio.wrap_future(future)
             self.set_status(200)
             self.write({
                 'results': results
@@ -41,7 +50,7 @@ class QueryHandler(TSJSONHandler):
         queries = self.get_query_argument('q').split(';')
         for q in queries:
             print(q)
-            queryResult = cursor.execute(q)
+            cursor.execute(q)
             values = cursor.fetchall()
             print(values)
             results.append({

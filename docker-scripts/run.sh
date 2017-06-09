@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+# give some time to timetrails db
+sleep 10
 ./docker-scripts/wait-for-it.sh monetdb:50000 -s -- echo "MonetDB is up"
 
 EXIT_CODE=$?

@@ -40,6 +40,12 @@ class PyMonetDBConnection(object):
             database=self.database, autocommit=False)
         self._cursor = self._connection.cursor()
 
+    def setCredentials(self, user, password, database):
+        self.user_name = user
+        self.user_password = password
+        self.database = database
+
+
     def close(self) -> None:
         self._cursor.close()
         self._connection.close()
