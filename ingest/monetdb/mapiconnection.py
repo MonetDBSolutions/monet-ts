@@ -29,7 +29,10 @@ class PyMonetDBConnection(object):
         self.user_name = user_name
         self.user_password = user_password
         self.database = database
-        self.open()
+        try:
+            self.open()
+        except BaseException as ex:
+            raise GuardianException(where=MAPI_CONNECTION_VIOLATION, message=ex.__str__())
 
     def open(self):
         self._connection = connect(
@@ -45,10 +48,12 @@ class PyMonetDBConnection(object):
         self.user_password = password
         self.database = database
 
-
     def close(self) -> None:
-        self._cursor.close()
-        self._connection.close()
+        try:
+            self._cursor.close()
+            self._connection.close()
+        except BaseException as ex:
+            raise GuardianException(where=MAPI_CONNECTION_VIOLATION, message=ex.__str__())
 
     def create_stream(self, schema: str, stream: str, columns: List[Dict[Any, Any]]) -> None:
         validated_columns = []
@@ -64,9 +69,9 @@ class PyMonetDBConnection(object):
         column_sql = ','.join(validated_columns)
         column_sql += ', PRIMARY KEY (' + ','.join(primary_keys) + ')'
 
-        try:  # TODO add STREAM table back!
+        try:
             self._cursor.execute("CREATE SCHEMA IF NOT EXISTS %s" % my_monet_escape(schema))
-            self._cursor.execute("CREATE TABLE %s.%s (%s)" % (my_monet_escape(schema), my_monet_escape(stream),
+            self._cursor.execute("CREATE STREAM TABLE %s.%s (%s)" % (my_monet_escape(schema), my_monet_escape(stream),
                                                               column_sql))
             self._connection.commit()
         except BaseException as ex:
@@ -101,9 +106,9 @@ class PyMonetDBConnection(object):
 
     def get_single_database_stream(self, schema: str, stream: str) -> Dict[Any, Any]:
         """The sql injection should be prevented from the upper layer, but I am doing here as well"""
-        try:  # TODO type='4'
+        try:
             sqlt = ''.join(["""SELECT tables."id", schemas."name", tables."name" FROM""",
-                            """(SELECT "id", "name", "schema_id" FROM sys.tables WHERE tables."name"='""",
+                            """(SELECT "id", "name", "schema_id" FROM sys.tables WHERE type='4' AND tables."name"='""",
                             my_monet_escape(stream),
                             """') AS tables INNER JOIN (SELECT "id", "name" FROM sys.schemas WHERE schemas."name"='""",
                             my_monet_escape(schema),
@@ -146,9 +151,9 @@ class PyMonetDBConnection(object):
     def get_database_streams(self) -> List[Dict[Any, Any]]:
         results = []
 
-        try:  # TODO add STREAM table back!  WHERE type=4
+        try:
             tables_sql_string = """SELECT tables."id", schemas."name", tables."name" FROM
-                (SELECT "id", "name", "schema_id" FROM sys.tables) AS tables INNER JOIN (SELECT "id",
+                (SELECT "id", "name", "schema_id" FROM sys.tables WHERE type=4) AS tables INNER JOIN (SELECT "id",
                 "name" FROM sys.schemas) AS schemas ON (tables."schema_id"=schemas."id") ORDER BY tables."id" """\
                 .replace('\n', ' ')
             self._cursor.execute(tables_sql_string)
@@ -157,7 +162,7 @@ class PyMonetDBConnection(object):
             if len(tables) > 0:
                 columns_sql_string = """SELECT columns."table_id", columns."name", columns."type", columns."null",
                     columns."type_digits" FROM (SELECT "id", "table_id", "name", "type", "null", "number", "type_digits"
-                    FROM sys.columns) AS columns INNER JOIN (SELECT "id" FROM sys.tables) AS tables ON
+                    FROM sys.columns) AS columns INNER JOIN (SELECT "id" FROM sys.tables WHERE type=4) AS tables ON
                     (tables."id"=columns."table_id") ORDER BY columns."table_id", columns."number" """\
                     .replace('\n', ' ')
                 self._cursor.execute(columns_sql_string)
@@ -182,11 +187,20 @@ class PyMonetDBConnection(object):
 
         return results
 
+
 THIS_MAPI_CONNECTION = None
+
+
+def shutdown_mapi_connection() -> None:
+    global THIS_MAPI_CONNECTION
+    if THIS_MAPI_CONNECTION is not None:
+        THIS_MAPI_CONNECTION.close()
+        THIS_MAPI_CONNECTION = None
 
 
 def init_mapi_connection(con_hostname: str, con_port: int, con_user: str, con_password: str, con_database: str) -> None:
     global THIS_MAPI_CONNECTION
+    shutdown_mapi_connection()
     THIS_MAPI_CONNECTION = PyMonetDBConnection(con_hostname, con_port, con_user, con_password, con_database)
 
 

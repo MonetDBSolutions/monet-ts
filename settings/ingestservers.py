@@ -9,21 +9,33 @@ from tsmqtt.mqttclient import mqttclient_coro
 logger = logging.getLogger('MonetDBTS ' + __name__)
 
 
-def init_servers(tornado_port, broker_port, app):
+def init_servers(tornado_port, broker_port, app) -> None:
     tornado.platform.asyncio.AsyncIOMainLoop().install()
-    app.listen(tornado_port, '0.0.0.0')
-    http_log = "Monet Time Stream HTTP server listening on port: " + str(tornado_port)
-    logger.info(http_log)
-    print(http_log)
+    try:
+        app.listen(tornado_port, '0.0.0.0')
+        http_log = "Monet Time Stream HTTP server listening on port: " + str(tornado_port)
+        logger.info(http_log)
+        print(http_log)
 
-    asyncio.get_event_loop().run_until_complete(ts_broker_start(broker_port))  # Run the TS_BROKER first :)
-    mqtt_broker_log = "MQTT broker listening on port 1833"
+        asyncio.get_event_loop().run_until_complete(ts_broker_start(broker_port))  # Run the TS_BROKER first :)
+        mqtt_broker_log = "MQTT broker listening on port 1833"
+        logger.info(mqtt_broker_log)
+        print(mqtt_broker_log)
+
+        asyncio.get_event_loop().run_until_complete(mqttclient_coro())
+        mqtt_client_log = "MQTT client connected"
+        logger.info(mqtt_client_log)
+        print(mqtt_client_log)
+
+        asyncio.get_event_loop().run_forever()
+    except asyncio.CancelledError:
+        pass
+    mqtt_broker_log = "Guardian server shutting down"
     logger.info(mqtt_broker_log)
     print(mqtt_broker_log)
+    asyncio.get_event_loop().close()
 
-    asyncio.get_event_loop().run_until_complete(mqttclient_coro())
-    mqtt_client_log = "MQTT client connected"
-    logger.info(mqtt_client_log)
-    print(mqtt_client_log)
 
-    asyncio.get_event_loop().run_forever()
+def stop_servers() -> None:
+    for task in asyncio.Task.all_tasks():
+        task.cancel()

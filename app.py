@@ -2,19 +2,27 @@
 
 import argparse
 import getpass
+import signal
 import socket
 import sys
+
 from termcolor import colored
 from ingest.streams.guardianexception import GuardianException
-
 from ingest.streams.streamcache import init_streams_context
-from ingest.monetdb.naming import DATABASE_NAME
+from ingest.monetdb.naming import DATABASE_NAME, THREAD_POOL
 from settings.settings import DEPLOYMENT_STAGE, PRODUCTION
-from settings.ingestservers import init_servers
-from ingest.monetdb.mapiconnection import PyMonetDBConnection
+from settings.ingestservers import init_servers, stop_servers
+from ingest.monetdb.mapiconnection import PyMonetDBConnection, shutdown_mapi_connection
 from tshttp import createApp
 
-def check_positive_int(value):
+
+def shutdown_guardian(signum, frame) -> None:
+    stop_servers()
+    shutdown_mapi_connection()
+    THREAD_POOL.shutdown()
+
+
+def check_positive_int(value) -> int:
     ivalue = int(value)
     if ivalue <= 0:
         raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
@@ -27,6 +35,7 @@ def check_ipv4_address(value):
     except socket.error:
         raise argparse.ArgumentTypeError("%s is an invalid IPv4 address" % value)
     return value
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='The Guardian!', epilog="There might exist bugs!", add_help=False)
@@ -68,4 +77,6 @@ if __name__ == "__main__":
         'dbConnection': dbConnection
     }
     app = createApp(app_options)
+    signal.signal(signal.SIGINT, shutdown_guardian)
+    signal.signal(signal.SIGTERM, shutdown_guardian)
     init_servers(args['port'], 1833, app)

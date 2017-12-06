@@ -5,6 +5,7 @@ from tshttp.ingest.ingestinfluxdb import InfluxDBInput, InfluxDBDiscovery, Influ
 from tshttp.ingest.ingestjson import StreamsHandling, JSONInput, StreamInfo
 from tshttp.queries.query import QueryHandler
 
+
 def createApp(options):
     app = Application([
         (r"/query", QueryHandler, options),

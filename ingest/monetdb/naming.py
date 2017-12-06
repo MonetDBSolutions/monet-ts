@@ -18,11 +18,11 @@ INFLUXDB_INTEGER_TYPE = 3
 INFLUXDB_FLOAT_TYPE = 4
 
 
-def get_default_timestamp_value():
+def get_default_timestamp_value() -> str:
     return datetime.datetime.now().isoformat()
 
 
-def my_monet_escape(data):
+def my_monet_escape(data) -> str:
     data = str(data).replace("\\", "\\\\")
     data = data.replace("\'", "\\\'")
     return "%s" % str(data)

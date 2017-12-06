@@ -39,6 +39,7 @@ def extra_validation_bounded(stream_column, stream_entry_counter, insert_counter
     else:
         return ''
 
+
 TYPE_CHECK_DICT = {}
 
 for entry in UNBOUNDED_TEXT_INPUTS + DATE_INPUTS + TIME_INPUTS:
